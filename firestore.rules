@@ -1,0 +1,485 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'dnshow53@gmail.com';
+    }
+
+    // Entity Validators
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['userId', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'displayName', 'createdAt', 'updatedAt'])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVerification(data, userId) {
+      return data.keys().hasAll([
+          'userId',
+          'packageId',
+          'robloxUsername',
+          'hasClickedGroupLink',
+          'hasConfirmedCheckbox',
+          'isGroupVerified',
+          'unlockAtMs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'packageId',
+          'robloxUsername',
+          'hasClickedGroupLink',
+          'hasConfirmedCheckbox',
+          'isGroupVerified',
+          'unlockAtMs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.packageId is string
+        && data.packageId.size() >= 1
+        && data.packageId.size() <= 128
+        && data.robloxUsername is string
+        && data.robloxUsername.size() <= 32
+        && data.hasClickedGroupLink is bool
+        && data.hasConfirmedCheckbox is bool
+        && data.isGroupVerified is bool
+        && (!data.isGroupVerified || (data.hasClickedGroupLink && data.hasConfirmedCheckbox))
+        && (data.unlockAtMs is int || data.unlockAtMs is float)
+        && data.unlockAtMs >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data, userId) {
+      return data.keys().hasAll([
+          'userId',
+          'orderNumber',
+          'packageId',
+          'packageTitle',
+          'robuxAmount',
+          'priceUsd',
+          'paymentMethod',
+          'robloxUsername',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'orderNumber',
+          'packageId',
+          'packageTitle',
+          'robuxAmount',
+          'priceUsd',
+          'paymentMethod',
+          'robloxUsername',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.orderNumber is string
+        && data.orderNumber.size() >= 4
+        && data.orderNumber.size() <= 32
+        && data.orderNumber.matches('^[A-Z0-9\\-]+$')
+        && data.packageId is string
+        && data.packageId.size() >= 1
+        && data.packageId.size() <= 128
+        && data.packageTitle is string
+        && data.packageTitle.size() >= 3
+        && data.packageTitle.size() <= 80
+        && (data.robuxAmount is int || data.robuxAmount is float)
+        && data.robuxAmount > 0
+        && data.robuxAmount <= 10000000
+        && (data.priceUsd is int || data.priceUsd is float)
+        && data.priceUsd > 0
+        && data.priceUsd <= 10000000
+        && data.paymentMethod is string
+        && data.paymentMethod.size() >= 2
+        && data.paymentMethod.size() <= 64
+        && data.robloxUsername is string
+        && data.robloxUsername.size() <= 32
+        && data.status is string
+        && data.status in ['queued', 'completed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStorePackage(data, packageId) {
+      return data.keys().hasAll([
+          'id',
+          'robux',
+          'title',
+          'tierLabel',
+          'priceBdt',
+          'deliveryNote',
+          'image',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'robux',
+          'title',
+          'tierLabel',
+          'priceBdt',
+          'deliveryNote',
+          'image',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.id is string
+        && data.id == packageId
+        && isValidId(data.id)
+        && (data.robux is int || data.robux is float)
+        && data.robux > 0
+        && data.robux <= 10000000
+        && data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 80
+        && data.tierLabel is string
+        && data.tierLabel.size() >= 1
+        && data.tierLabel.size() <= 80
+        && (data.priceBdt is int || data.priceBdt is float)
+        && data.priceBdt > 0
+        && data.priceBdt <= 10000000
+        && data.deliveryNote is string
+        && data.deliveryNote.size() <= 80
+        && data.image is string
+        && data.image.size() <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStoreSettings(data) {
+      return data.keys().hasAll(['groupId', 'groupUrl', 'updatedAt'])
+        && data.keys().hasOnly(['groupId', 'groupUrl', 'availableRobux', 'restockTimestamp', 'updatedAt'])
+        && (data.groupId is int || data.groupId is float)
+        && data.groupId > 0
+        && data.groupUrl is string
+        && data.groupUrl.size() >= 10
+        && data.groupUrl.size() <= 500
+        && (!('availableRobux' in data) || ((data.availableRobux is int || data.availableRobux is float) && data.availableRobux >= 0 && data.availableRobux <= 1000000000))
+        && (!('restockTimestamp' in data) || ((data.restockTimestamp is int || data.restockTimestamp is float) && data.restockTimestamp >= 0))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStoreOrder(data, orderId) {
+      return data.keys().hasAll([
+          'id',
+          'orderNumber',
+          'userEmail',
+          'userName',
+          'userPhone',
+          'robloxUsername',
+          'robloxUserId',
+          'packageId',
+          'packageTitle',
+          'robuxAmount',
+          'priceBdt',
+          'paymentMethod',
+          'status',
+          'verifiedAtMs',
+          'unlockAtMs',
+          'createdAtIso',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'orderNumber',
+          'userEmail',
+          'userName',
+          'userPhone',
+          'robloxUsername',
+          'robloxUserId',
+          'packageId',
+          'packageTitle',
+          'robuxAmount',
+          'priceBdt',
+          'paymentMethod',
+          'transactionId',
+          'paymentVerified',
+          'status',
+          'verifiedAtMs',
+          'unlockAtMs',
+          'createdAtIso',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.id is string
+        && data.id == orderId
+        && isValidId(data.id)
+        && data.orderNumber is string
+        && data.orderNumber.size() >= 4
+        && data.orderNumber.size() <= 32
+        && data.orderNumber.matches('^[A-Z0-9\\-]+$')
+        && data.userEmail is string
+        && data.userEmail.size() >= 3
+        && data.userEmail.size() <= 160
+        && data.userName is string
+        && data.userName.size() >= 1
+        && data.userName.size() <= 120
+        && data.userPhone is string
+        && data.userPhone.size() <= 40
+        && data.robloxUsername is string
+        && data.robloxUsername.size() <= 40
+        && (data.robloxUserId is int || data.robloxUserId is float)
+        && data.robloxUserId >= 0
+        && data.packageId is string
+        && data.packageId.size() <= 128
+        && data.packageTitle is string
+        && data.packageTitle.size() >= 1
+        && data.packageTitle.size() <= 80
+        && (data.robuxAmount is int || data.robuxAmount is float)
+        && data.robuxAmount >= 0
+        && data.robuxAmount <= 10000000
+        && (data.priceBdt is int || data.priceBdt is float)
+        && data.priceBdt >= 0
+        && data.priceBdt <= 10000000
+        && data.paymentMethod is string
+        && data.paymentMethod.size() >= 1
+        && data.paymentMethod.size() <= 80
+        && (!('transactionId' in data) || (data.transactionId is string && data.transactionId.size() <= 32))
+        && (!('paymentVerified' in data) || data.paymentVerified is bool)
+        && data.status is string
+        && data.status in ['Waiting', 'Pending', 'Approved', 'Completed', 'Cancelled']
+        && (data.verifiedAtMs is int || data.verifiedAtMs is float)
+        && data.verifiedAtMs >= 0
+        && (data.unlockAtMs is int || data.unlockAtMs is float)
+        && data.unlockAtMs >= 0
+        && data.createdAtIso is string
+        && data.createdAtIso.size() >= 10
+        && data.createdAtIso.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Public Storefront Packages (No PII; Admin-only writes)
+    match /packages/{packageId} {
+      allow get: if isValidId(packageId);
+      allow list: if resource.data.robux > 0;
+
+      allow create: if isAdmin()
+        && isValidId(packageId)
+        && isValidStorePackage(incoming(), packageId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(packageId)
+        && isValidStorePackage(incoming(), packageId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'robux',
+          'title',
+          'tierLabel',
+          'priceBdt',
+          'deliveryNote',
+          'image',
+          'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(packageId);
+    }
+
+    // Storefront Group Settings Singleton (No PII; Admin-only writes)
+    match /storeSettings/{settingId} {
+      allow get: if isValidId(settingId) && settingId == 'group';
+      allow list: if false;
+
+      allow create: if isAdmin()
+        && isValidId(settingId)
+        && settingId == 'group'
+        && isValidStoreSettings(incoming())
+        && incoming().updatedAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(settingId)
+        && settingId == 'group'
+        && isValidStoreSettings(incoming())
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'groupId',
+          'groupUrl',
+          'availableRobux',
+          'restockTimestamp',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // Store Orders (PII-protected; strictly Admin-only)
+    match /storeOrders/{orderId} {
+      allow get: if isAdmin() && isValidId(orderId);
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && isValidId(orderId)
+        && isValidStoreOrder(incoming(), orderId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(orderId)
+        && isValidStoreOrder(incoming(), orderId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().createdAtIso == existing().createdAtIso
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'orderNumber',
+          'userEmail',
+          'userName',
+          'userPhone',
+          'robloxUsername',
+          'robloxUserId',
+          'packageId',
+          'packageTitle',
+          'robuxAmount',
+          'priceBdt',
+          'paymentMethod',
+          'transactionId',
+          'paymentVerified',
+          'status',
+          'verifiedAtMs',
+          'unlockAtMs',
+          'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+
+    // Users root collection (PII-isolated, owner-only)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUser(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUser(incoming(), userId)
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+
+      allow delete: if false;
+
+      // Verification & 14-day timer state subcollection
+      match /verifications/{verificationId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(verificationId);
+        allow list: if isOwner(userId) && isValidId(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(verificationId)
+          && isValidVerification(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(verificationId)
+          && isValidVerification(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.userId == request.auth.uid
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'packageId',
+              'robloxUsername',
+              'hasClickedGroupLink',
+              'hasConfirmedCheckbox',
+              'isGroupVerified',
+              'unlockAtMs',
+              'updatedAt'
+            ])
+          );
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(verificationId);
+      }
+
+      // Orders subcollection
+      match /orders/{orderId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(orderId);
+        allow list: if isOwner(userId) && isValidId(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(orderId)
+          && isValidOrder(incoming(), userId)
+          && incoming().status == 'queued'
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(orderId)
+          && isValidOrder(incoming(), userId)
+          && existing().status != 'completed'
+          && incoming().userId == existing().userId
+          && incoming().orderNumber == existing().orderNumber
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.userId == request.auth.uid
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+        allow delete: if false;
+      }
+    }
+  }
+}

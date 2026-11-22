@@ -1,0 +1,6 @@
+{
+  "name": "BloxMint",
+  "description": "Dark-themed Robux package storefront with mandatory Roblox group verification, 14-day security countdown, and gated checkout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

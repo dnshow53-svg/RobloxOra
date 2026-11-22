@@ -1,0 +1,2061 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RobuxOra — Real-Time Roblox API Verification Store</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Outfit:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Outfit', 'sans-serif'],
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #090b0e;
+      color: #f4f4f5;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Universal Button & Link Polish */
+    button:not(:disabled),
+    a[href],
+    input[type="submit"],
+    input[type="button"],
+    [role="button"] {
+      position: relative;
+      overflow: hidden;
+      transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  background-color 160ms ease,
+                  border-color 160ms ease,
+                  color 160ms ease,
+                  filter 160ms ease;
+      will-change: transform;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:not(:disabled):hover,
+    a[href]:hover {
+      transform: translateY(-2px) scale(1.02);
+    }
+
+    button:not(:disabled):active,
+    a[href]:active {
+      transform: translateY(1px) scale(0.95) !important;
+      transition-duration: 70ms !important;
+    }
+
+    button.bg-amber-400:not(:disabled),
+    a.bg-amber-400 {
+      box-shadow: 0 4px 14px -3px rgba(251, 191, 36, 0.4);
+    }
+
+    button.bg-amber-400:not(:disabled):hover,
+    a.bg-amber-400:hover {
+      box-shadow: 0 0 24px -2px rgba(251, 191, 36, 0.65), 0 8px 24px -4px rgba(0, 0, 0, 0.45);
+      filter: brightness(1.04);
+    }
+
+    button.bg-amber-400:not(:disabled)::after,
+    a.bg-amber-400::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -70%;
+      width: 50%;
+      height: 200%;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.4) 50%,
+        transparent 100%
+      );
+      transform: rotate(25deg);
+      pointer-events: none;
+      animation: btnShimmerSweep 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    button.bg-amber-400:not(:disabled):hover::after,
+    a.bg-amber-400:hover::after {
+      animation: btnShimmerSweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes btnAmberAura {
+      0%, 100% { box-shadow: 0 4px 14px -3px rgba(251, 191, 36, 0.45); }
+      50% { box-shadow: 0 6px 22px -2px rgba(251, 191, 36, 0.65), 0 0 14px 1px rgba(251, 191, 36, 0.35); }
+    }
+
+    button.bg-amber-400:not(:disabled),
+    a.bg-amber-400 {
+      animation: btnAmberAura 3s ease-in-out infinite;
+    }
+
+    @keyframes btnShimmerSweep {
+      0% { left: -70%; }
+      28%, 100% { left: 140%; }
+    }
+
+    @keyframes btnClickPop {
+      0% { transform: scale(0.92); }
+      38% { transform: scale(1.06); }
+      72% { transform: scale(0.98); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes btnShockwaveAmber {
+      0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.75), 0 0 18px rgba(251, 191, 36, 0.55); }
+      50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.35), 0 0 26px rgba(251, 191, 36, 0.35); }
+      100% { box-shadow: 0 0 0 16px rgba(251, 191, 36, 0), 0 0 32px rgba(251, 191, 36, 0); }
+    }
+
+    @keyframes btnShockwaveEmerald {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8), 0 0 18px rgba(16, 185, 129, 0.6); }
+      50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.4), 0 0 26px rgba(16, 185, 129, 0.4); }
+      100% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0), 0 0 32px rgba(16, 185, 129, 0); }
+    }
+
+    @keyframes btnShockwaveRed {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.85), 0 0 18px rgba(239, 68, 68, 0.65); }
+      50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.45), 0 0 26px rgba(239, 68, 68, 0.4); }
+      100% { box-shadow: 0 0 0 16px rgba(239, 68, 68, 0), 0 0 32px rgba(239, 68, 68, 0); }
+    }
+
+    @keyframes btnShockwaveNeutral {
+      0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.65), 0 0 14px rgba(255, 255, 255, 0.4); }
+      50% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.25), 0 0 22px rgba(255, 255, 255, 0.25); }
+      100% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0), 0 0 26px rgba(255, 255, 255, 0); }
+    }
+
+    .is-btn-clicked {
+      animation: btnClickPop 340ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+    }
+
+    .is-btn-clicked.shockwave-amber {
+      animation: btnClickPop 340ms cubic-bezier(0.22, 1, 0.36, 1), btnShockwaveAmber 440ms ease-out forwards !important;
+    }
+
+    .is-btn-clicked.shockwave-emerald {
+      animation: btnClickPop 340ms cubic-bezier(0.22, 1, 0.36, 1), btnShockwaveEmerald 440ms ease-out forwards !important;
+    }
+
+    .is-btn-clicked.shockwave-red {
+      animation: btnClickPop 340ms cubic-bezier(0.22, 1, 0.36, 1), btnShockwaveRed 440ms ease-out forwards !important;
+    }
+
+    .is-btn-clicked.shockwave-neutral {
+      animation: btnClickPop 340ms cubic-bezier(0.22, 1, 0.36, 1), btnShockwaveNeutral 440ms ease-out forwards !important;
+    }
+
+    .btn-dynamic-ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, rgba(251, 191, 36, 0.5) 45%, transparent 70%);
+      transform: scale(0);
+      animation: dynamicRippleAnim 560ms cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+      pointer-events: none;
+      z-index: 40;
+    }
+
+    @keyframes dynamicRippleAnim {
+      0% { transform: scale(0); opacity: 0.95; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    button:hover svg,
+    a[href]:hover svg {
+      transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#090B0E] text-zinc-100 antialiased flex flex-col">
+
+  <!-- Header Navigation -->
+  <header class="sticky top-0 z-40 bg-[#090B0E]/90 backdrop-blur-md border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
+      <a href="#top" class="inline-flex items-center gap-2.5 font-display text-lg font-bold tracking-tight text-zinc-100 whitespace-nowrap shrink-0">
+        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-amber-400 shrink-0" aria-hidden="true">
+          <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          <rect x="8.75" y="8.75" width="6.5" height="6.5" rx="1" stroke="currentColor" stroke-width="1.75" />
+        </svg>
+        <span>RobuxOra</span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-7 text-sm font-medium text-zinc-400">
+        <a href="#packages" class="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap">Packages</a>
+        <a href="#how-it-works" class="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap">Verification</a>
+        <a href="#faq" class="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap">FAQ</a>
+      </nav>
+
+      <div id="headerAuthArea" class="flex items-center gap-2.5 shrink-0"></div>
+    </div>
+  </header>
+
+  <main id="top" class="flex-1">
+    <!-- Admin Control Panel -->
+    <section id="adminSection" class="hidden py-12 border-b border-amber-400/20 bg-[#0D1117]">
+      <div class="max-w-6xl mx-auto px-6 space-y-8">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-2xl font-bold text-zinc-100">Admin Control Panel</h2>
+            <p class="text-xs text-zinc-400">Manage storefront items, customer orders, and target Roblox Group ID.</p>
+          </div>
+          <div class="inline-flex flex-wrap items-center gap-1 rounded-lg bg-[#131820] border border-white/10 p-1">
+            <button id="adminTabPackages" type="button" class="rounded-md px-4 py-2 text-xs font-semibold bg-amber-400 text-zinc-950">Manage Packages</button>
+            <button id="adminTabOrders" type="button" class="rounded-md px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Manage Orders</button>
+            <button id="adminTabGroup" type="button" class="rounded-md px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Group Settings</button>
+          </div>
+        </div>
+
+        <!-- Admin Tab: Packages -->
+        <div id="adminPackagesView" class="space-y-4">
+          <div id="admPkgNotice" class="hidden rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-4 py-2.5 text-xs font-medium text-emerald-300"></div>
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <form id="adminAddPackageForm" class="lg:col-span-5 rounded-xl bg-[#131820] border border-white/10 p-6 space-y-4">
+            <h3 class="font-display text-base font-semibold text-zinc-100">Add New Robux Package</h3>
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="admRobux">Robux Amount</label>
+              <input id="admRobux" type="number" min="1" required placeholder="e.g. 4500" class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="admBdt">Price (BDT)</label>
+              <input id="admBdt" type="number" min="1" required placeholder="e.g. 5900" class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="admTag">Bonus / Tag</label>
+              <input id="admTag" type="text" value="Group Payout" class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+            <button type="submit" class="w-full min-h-[44px] rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors">
+              Add Item to Storefront
+            </button>
+          </form>
+
+          <div class="lg:col-span-7 rounded-xl bg-[#131820] border border-white/10 p-6 space-y-4">
+            <h3 class="font-display text-base font-semibold text-zinc-100">Active Storefront Items</h3>
+            <div id="adminPackagesList" class="space-y-3"></div>
+          </div>
+          </div>
+        </div>
+
+        <!-- Admin Tab: Orders -->
+        <div id="adminOrdersView" class="hidden rounded-xl bg-[#131820] border border-white/10 p-6 space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-display text-base font-semibold text-zinc-100">Customer Purchase Requests &amp; Orders</h3>
+              <p class="text-xs text-zinc-400 mt-0.5">Approve payouts, mark completed, cancel, or delete orders.</p>
+            </div>
+            <button id="refreshOrdersBtn" type="button" class="inline-flex min-h-[38px] items-center justify-center rounded-lg bg-white/5 border border-white/10 px-3.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10 self-start sm:self-auto">
+              Refresh Orders
+            </button>
+          </div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div id="orderFilterBar" class="flex flex-wrap items-center gap-1.5">
+              <button type="button" data-ord-filter="All" class="ord-filter-btn rounded-md px-3 py-1.5 text-xs font-semibold bg-amber-400 text-zinc-950">All</button>
+              <button type="button" data-ord-filter="Waiting" class="ord-filter-btn rounded-md px-3 py-1.5 text-xs font-medium bg-[#0D1117] border border-white/10 text-zinc-300">Waiting</button>
+              <button type="button" data-ord-filter="Pending" class="ord-filter-btn rounded-md px-3 py-1.5 text-xs font-medium bg-[#0D1117] border border-white/10 text-zinc-300">Pending</button>
+              <button type="button" data-ord-filter="Approved" class="ord-filter-btn rounded-md px-3 py-1.5 text-xs font-medium bg-[#0D1117] border border-white/10 text-zinc-300">Approved</button>
+              <button type="button" data-ord-filter="Completed" class="ord-filter-btn rounded-md px-3 py-1.5 text-xs font-medium bg-[#0D1117] border border-white/10 text-zinc-300">Completed</button>
+              <button type="button" data-ord-filter="Cancelled" class="ord-filter-btn rounded-md px-3 py-1.5 text-xs font-medium bg-[#0D1117] border border-white/10 text-zinc-300">Cancelled</button>
+            </div>
+            <input id="orderSearchInput" type="text" placeholder="Search order #, phone, Roblox, email..." class="w-full sm:w-64 min-h-[38px] rounded-lg bg-[#090B0E] border border-white/10 px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-500" />
+          </div>
+          <div id="adminOrdersList"></div>
+        </div>
+
+        <!-- Admin Tab: Group Settings -->
+        <form id="adminGroupForm" class="hidden max-w-2xl rounded-xl bg-[#131820] border border-white/10 p-6 space-y-4">
+          <h3 class="font-display text-base font-semibold text-zinc-100">Roblox Community API Settings</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="admGroupId">Roblox Group ID</label>
+              <input id="admGroupId" type="number" min="1" required class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 font-mono text-sm text-zinc-100" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="admGroupUrl">Group Link</label>
+              <input id="admGroupUrl" type="url" required class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+          </div>
+          <div id="admGroupSavedMsg" class="hidden rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5 text-xs font-medium text-emerald-300">
+            Group ID &amp; Link saved!
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="min-h-[42px] rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300">
+              Save Group Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Hero Section -->
+    <section class="py-16 lg:py-20">
+      <div class="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <div class="lg:col-span-7 space-y-6">
+          <p class="text-xs font-medium tracking-wide text-amber-400">Velvet Visions Studio · Real-Time API Verification</p>
+          <h1 class="font-display text-4xl sm:text-5xl font-bold tracking-tight text-zinc-100 leading-[1.08]">
+            Verified Robux Packages Delivered via Group Funds
+          </h1>
+          <p class="text-base text-zinc-400 leading-relaxed max-w-xl">
+            Select a Robux package, join our official Roblox community, and verify your username via the Roblox Public API to start the 15-day security countdown.
+          </p>
+          <div class="flex flex-wrap items-center gap-4 pt-1">
+            <a href="#packages" class="inline-flex min-h-[46px] items-center justify-center rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors">
+              Browse Packages
+            </a>
+            <a href="#how-it-works" class="inline-flex min-h-[46px] items-center justify-center rounded-lg border border-white/10 bg-[#131820] px-5 py-3 text-sm font-medium text-zinc-200 hover:border-white/25 transition-colors">
+              How Verification Works
+            </a>
+          </div>
+          <div class="pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+            <span>Real-Time Roblox API Check</span>
+            <span aria-hidden="true">&middot;</span>
+            <span>15-Day Security Hold</span>
+            <span aria-hidden="true">&middot;</span>
+            <span>Zero Password Required</span>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 rounded-xl bg-[#131820] border border-white/10 p-6 space-y-4">
+          <p class="text-xs font-medium text-amber-400">Official Roblox Community</p>
+          <h2 class="font-display text-xl font-bold text-zinc-100">Automatic Membership Verification</h2>
+          <p class="text-sm text-zinc-400 leading-relaxed">
+            Your Roblox username is checked live against Roblox Groups API. Leaving the group resets your 15-day timer automatically.
+          </p>
+          <a
+            id="heroGroupLink"
+            href="https://www.roblox.com/communities/401717676/Velvet-Visions-Studio#!/about"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex min-h-[42px] items-center justify-center rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 transition-colors"
+          >
+            Open Community Group
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Packages Shop Section -->
+    <section id="packages" class="py-20 border-t border-white/10">
+      <div class="max-w-6xl mx-auto px-6 space-y-10">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <p class="text-xs font-medium tracking-wide text-amber-400 mb-2">Robux Storefront</p>
+            <h2 class="font-display text-3xl sm:text-4xl font-bold tracking-tight text-zinc-100">Select a Robux Package</h2>
+          </div>
+          <p class="text-sm text-zinc-400 max-w-md">
+            Click Buy Now on any package to verify your Roblox username against our community group in real time.
+          </p>
+        </div>
+
+        <div id="packagesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+      </div>
+    </section>
+
+    <!-- How It Works / FAQ -->
+    <section id="how-it-works" class="py-20 border-t border-white/10">
+      <div id="faq" class="max-w-6xl mx-auto px-6 space-y-8">
+        <h2 class="font-display text-3xl font-bold tracking-tight text-zinc-100">Verification &amp; Payout Rules</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div class="rounded-xl bg-[#131820] border border-white/10 p-6 space-y-2">
+            <h3 class="font-display text-base font-semibold text-zinc-100">01. Live Roblox API Check</h3>
+            <p class="text-sm text-zinc-400 leading-relaxed">RobuxOra resolves your Roblox ID and checks your joined group list automatically.</p>
+          </div>
+          <div class="rounded-xl bg-[#131820] border border-white/10 p-6 space-y-2">
+            <h3 class="font-display text-base font-semibold text-zinc-100">02. Auto-Reset Unjoin Guard</h3>
+            <p class="text-sm text-zinc-400 leading-relaxed">Leaving the community group resets your 15-day timer and locks payment immediately.</p>
+          </div>
+          <div class="rounded-xl bg-[#131820] border border-white/10 p-6 space-y-2">
+            <h3 class="font-display text-base font-semibold text-zinc-100">03. Persistent Accounts</h3>
+            <p class="text-sm text-zinc-400 leading-relaxed">All accounts, profile edits, packages, orders, and timer states persist in localStorage.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-white/10 py-8 text-center text-xs text-zinc-500">
+    RobuxOra · Velvet Visions Studio Community Storefront
+  </footer>
+
+  <!-- Auth Modal -->
+  <div id="authModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+    <div class="w-full max-w-md rounded-xl bg-[#131820] border border-white/10 shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+        <div>
+          <h2 id="authModalTitle" class="font-display text-lg font-semibold text-zinc-100">Customer Sign In</h2>
+          <p id="authModalSubtitle" class="text-xs text-zinc-400 mt-0.5">Sign in with your Gmail and password</p>
+        </div>
+        <button id="closeAuthBtn" type="button" class="h-10 w-10 rounded-lg text-zinc-400 hover:bg-white/5 hover:text-zinc-100 flex items-center justify-center" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div id="authErrorBox" class="hidden rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-xs font-medium text-red-300"></div>
+
+        <form id="userSignInForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="loginEmail">Gmail</label>
+            <input id="loginEmail" type="email" required placeholder="you@gmail.com" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" required placeholder="Enter your password" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <button type="submit" class="w-full min-h-[44px] rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors">Sign In</button>
+          <div class="text-center pt-1">
+            <button id="goToSignUpBtn" type="button" class="text-sm font-medium text-amber-300 hover:text-amber-200">Create an Account</button>
+          </div>
+        </form>
+
+        <form id="userSignUpForm" class="hidden space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="regName">Full Name</label>
+            <input id="regName" type="text" required placeholder="Alex Johnson" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="regEmail">Gmail</label>
+            <input id="regEmail" type="email" required placeholder="you@gmail.com" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="regPhone">Phone Number</label>
+            <input id="regPhone" type="tel" required placeholder="+880 1XXX-XXXXXX" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="regPassword">Password</label>
+            <input id="regPassword" type="password" required minlength="4" placeholder="Minimum 4 characters" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <button type="submit" class="w-full min-h-[44px] rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors">Create Account &amp; Sign In</button>
+          <div class="text-center pt-1">
+            <button id="backToSignInFromRegBtn" type="button" class="text-xs font-medium text-zinc-400 hover:text-zinc-200">Already have an account? Sign In</button>
+          </div>
+        </form>
+
+        <form id="adminSignInForm" class="hidden space-y-4">
+          <div class="rounded-lg bg-[#0D1117] border border-amber-400/20 p-3 text-xs text-amber-300">Restricted Website Owner / Admin Login</div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="adminEmail">Admin Email</label>
+            <input id="adminEmail" name="admin-email" type="email" required autocomplete="off" placeholder="Enter admin email" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="adminPassword">Admin Password</label>
+            <input id="adminPassword" name="admin-password" type="password" required autocomplete="new-password" placeholder="Enter admin password" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100" />
+          </div>
+          <button type="submit" class="w-full min-h-[44px] rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white transition-colors">Sign In as Admin</button>
+          <div class="text-center pt-1">
+            <button id="backToSignInFromAdmBtn" type="button" class="text-xs font-medium text-zinc-400 hover:text-zinc-200">Back to Customer Sign In</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="adminFooterStrip" class="px-6 py-4 bg-[#0D1117] border-t border-white/10 flex items-center justify-between text-xs">
+        <span class="text-zinc-500">Store Administrator?</span>
+        <button id="goToAdminBtn" type="button" class="font-semibold text-zinc-300 hover:text-amber-300">Admin Sign In</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Profile Modal -->
+  <div id="profileModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+    <div class="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl bg-[#131820] border border-white/10 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+        <div>
+          <h2 class="font-display text-lg font-semibold text-zinc-100">My Profile &amp; Orders</h2>
+          <p class="text-xs text-zinc-400">Edit your saved profile information anytime</p>
+        </div>
+        <button id="closeProfileBtn" type="button" class="h-10 w-10 rounded-lg text-zinc-400 hover:bg-white/5 hover:text-zinc-100 flex items-center justify-center" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <form id="profileForm" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="profName">Full Name</label>
+              <input id="profName" type="text" required class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="profEmail">Gmail</label>
+              <input id="profEmail" type="email" required class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="profPhone">Phone Number</label>
+              <input id="profPhone" type="tel" required class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-300 mb-1.5" for="profPass">Password</label>
+              <input id="profPass" type="text" required minlength="4" class="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100" />
+            </div>
+          </div>
+          <div id="profErrorMsg" class="hidden rounded-lg bg-red-500/10 border border-red-500/30 px-3.5 py-2.5 text-xs font-medium text-red-300"></div>
+          <div id="profSavedMsg" class="hidden rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5 text-xs font-medium text-emerald-300">
+            Profile changes saved!
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="min-h-[42px] rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300">Save Profile Changes</button>
+          </div>
+        </form>
+
+        <div class="pt-5 border-t border-white/10 space-y-3">
+          <h3 class="font-display text-sm font-semibold text-zinc-200">Order History</h3>
+          <div id="userOrdersList" class="space-y-2.5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkout & Real-Time Roblox API Verification Modal -->
+  <div id="checkoutModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+    <div class="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-xl bg-[#131820] border border-white/10 shadow-2xl">
+      <div class="sticky top-0 z-10 bg-[#131820] flex items-center justify-between px-6 py-5 border-b border-white/10">
+        <div>
+          <h2 class="font-display text-lg font-semibold text-zinc-100">Checkout &amp; Real-Time Group Verification</h2>
+          <p id="modalPkgSummary" class="text-xs text-zinc-400 font-mono tabular-nums"></p>
+        </div>
+        <button id="closeCheckoutBtn" type="button" class="h-10 w-10 rounded-lg text-zinc-400 hover:bg-white/5 hover:text-zinc-100 flex items-center justify-center" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <div class="rounded-lg bg-[#0D1117] border border-white/10 p-4">
+          <p class="text-sm font-medium text-zinc-100">You must join our official Roblox community group before purchasing.</p>
+          <p id="modalGroupHint" class="mt-1 text-xs text-zinc-400">
+            Membership is verified automatically via the official Roblox Groups API. Leaving the group resets your 15-day timer.
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-zinc-300">Step 1. Join our official Roblox community group</span>
+            <span id="modalLinkStatus" class="font-medium text-zinc-500">Not Clicked Yet</span>
+          </div>
+          <a
+            id="modalGroupLink"
+            href="https://www.roblox.com/communities/401717676/Velvet-Visions-Studio#!/about"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex w-full min-h-[44px] items-center justify-center rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+          >
+            Join Community
+          </a>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-300 mb-2" for="modalRobloxUser">Enter your Roblox Username *</label>
+            <input id="modalRobloxUser" type="text" required placeholder="Enter exact Roblox username" class="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 disabled:opacity-60" />
+          </div>
+
+          <div id="modalErrorBox" class="hidden rounded-lg bg-red-500/10 border border-red-500/30 p-3.5 text-sm font-medium text-red-300" role="alert"></div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="modalVerifyBtn" type="button" class="min-h-[44px] rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white">
+              Verify Membership
+            </button>
+            <span id="modalVerifiedBadge" class="hidden rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+              Verified Member
+            </span>
+            <button id="modalResetBtn" type="button" class="hidden text-xs text-zinc-400 hover:text-zinc-200 px-3 py-2">Reset Verification</button>
+          </div>
+        </div>
+
+        <!-- 15-Day Countdown Timer -->
+        <div class="rounded-xl bg-[#0D1117] border border-white/10 p-5 space-y-4">
+          <div>
+            <h3 class="font-display text-sm font-semibold text-zinc-100">15-Day Security Countdown Timer</h3>
+            <p id="modalTimerSubtitle" class="text-xs text-zinc-400 mt-0.5">Join the group and click Verify Membership to start the 15-day timer.</p>
+          </div>
+          <div class="grid grid-cols-4 gap-3 text-center">
+            <div class="rounded-lg bg-[#131820] border border-white/10 py-3 px-2">
+              <div id="cdDays" class="font-mono text-xl sm:text-2xl font-semibold text-zinc-500 tabular-nums">14</div>
+              <div class="mt-0.5 text-[11px] text-zinc-400">Days</div>
+            </div>
+            <div class="rounded-lg bg-[#131820] border border-white/10 py-3 px-2">
+              <div id="cdHours" class="font-mono text-xl sm:text-2xl font-semibold text-zinc-500 tabular-nums">00</div>
+              <div class="mt-0.5 text-[11px] text-zinc-400">Hours</div>
+            </div>
+            <div class="rounded-lg bg-[#131820] border border-white/10 py-3 px-2">
+              <div id="cdMinutes" class="font-mono text-xl sm:text-2xl font-semibold text-zinc-500 tabular-nums">00</div>
+              <div class="mt-0.5 text-[11px] text-zinc-400">Minutes</div>
+            </div>
+            <div class="rounded-lg bg-[#131820] border border-white/10 py-3 px-2">
+              <div id="cdSeconds" class="font-mono text-xl sm:text-2xl font-semibold text-zinc-500 tabular-nums">00</div>
+              <div class="mt-0.5 text-[11px] text-zinc-400">Seconds</div>
+            </div>
+          </div>
+          <button id="adminUnlockTimerBtn" type="button" class="hidden w-full min-h-[40px] rounded-lg bg-amber-400/15 border border-amber-400/40 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/25 transition-colors">
+            Admin: Complete Timer &amp; Unlock Payment
+          </button>
+        </div>
+
+        <!-- Payment Section inside Modal -->
+        <div class="rounded-xl bg-[#0D1117] border border-white/10 p-5 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
+            <div>
+              <h3 class="font-display text-base font-semibold text-zinc-100">Payment Section</h3>
+              <p id="paymentStatusDesc" class="mt-1 text-xs font-medium text-zinc-400">Complete group join and wait 15 days to unlock payment.</p>
+            </div>
+            <span id="paymentBadge" class="text-xs font-semibold text-zinc-400">Unavailable - 15 days pending</span>
+          </div>
+
+          <div id="modalPaymentGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+
+          <div id="modalCheckoutBar" class="hidden flex-wrap items-center justify-between gap-3 pt-2">
+            <span id="modalTotalLabel" class="text-xs text-zinc-300 font-mono tabular-nums"></span>
+            <button id="submitOrderBtn" type="button" class="min-h-[42px] rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300">Submit Order to Queue</button>
+          </div>
+
+          <div id="modalReceiptBox" class="hidden rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-4 text-xs text-emerald-300 font-medium"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Default Roblox Group ID & Community URL (editable live in Admin Panel -> Group Settings)
+    const TARGET_GROUP_ID = 401717676;
+    const DEFAULT_GROUP_URL = 'https://www.roblox.com/communities/401717676/Velvet-Visions-Studio#!/about';
+    const CORS_PROXY = 'https://corsproxy.io/?';
+
+    const ADMIN_EMAIL = 'dnshow53@gmail.com';
+    const ADMIN_PASSWORD = '12345678';
+    const FIFTEEN_DAYS_SECONDS = 15 * 24 * 60 * 60;
+
+    const CLICK_ERROR = 'You are not clicked! Please click Join Community first.';
+    const NOT_JOINED_ERROR = 'Verification Failed! You have not joined the Roblox community yet. Please join the group on Roblox and try again.';
+    const UNJOINED_WARNING = 'You left the Roblox community! You must rejoin and wait 15 days again to unlock payment.';
+
+    const KEYS = {
+      PACKAGES: 'bloxmint_packages_v1',
+      USERS: 'bloxmint_users_v1',
+      SESSION: 'bloxmint_session_v1',
+      ORDERS: 'bloxmint_orders_v1',
+      GROUP_SETTINGS: 'bloxmint_group_settings_v1',
+      TIMER_PREFIX: 'bloxmint_timer_v2_',
+    };
+
+    const DEFAULT_PACKAGES = [
+      { id: 'pkg-400', robux: 400, title: '400 Robux', tierLabel: 'Starter Vault', priceBdt: 590, deliveryNote: 'Group Payout' },
+      { id: 'pkg-800', robux: 800, title: '800 Robux', tierLabel: 'Standard Stack', priceBdt: 1180, deliveryNote: 'Most Selected' },
+      { id: 'pkg-1700', robux: 1700, title: '1,700 Robux', tierLabel: 'Titanium Vault', priceBdt: 2350, deliveryNote: 'Best Value' },
+    ];
+
+    const PAYMENT_METHODS = [
+      { id: 'nagad', name: 'Nagad', detail: 'Send Money: 01764088123' },
+      { id: 'rocket', name: 'Rocket', detail: 'Send Money: 01764088123' },
+      { id: 'bkash', name: 'bKash', detail: 'BDT mobile wallet' },
+    ];
+
+    const $ = (id) => document.getElementById(id);
+
+    function readLS(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function writeLS(key, val) {
+      try {
+        localStorage.setItem(key, JSON.stringify(val));
+      } catch {}
+    }
+
+    let packages = readLS(KEYS.PACKAGES, null);
+    if (!packages || !Array.isArray(packages) || packages.length === 0) {
+      packages = DEFAULT_PACKAGES;
+      writeLS(KEYS.PACKAGES, packages);
+    } else {
+      packages = packages.map((p) => ({
+        ...p,
+        priceBdt: Number(p.priceBdt) || Math.round(Number(p.priceUsd || 5) * 118),
+      }));
+    }
+
+    let groupSettings = readLS(KEYS.GROUP_SETTINGS, {
+      groupId: TARGET_GROUP_ID,
+      groupUrl: DEFAULT_GROUP_URL,
+    });
+
+    let users = readLS(KEYS.USERS, []);
+    let session = readLS(KEYS.SESSION, null);
+    let orders = readLS(KEYS.ORDERS, []);
+    let selectedPackage = packages[0] || DEFAULT_PACKAGES[0];
+    let selectedPaymentId = null;
+    let isVerifyingApi = false;
+    let timerInterval = null;
+
+    function timerKey() {
+      return KEYS.TIMER_PREFIX + (session?.email ? session.email.toLowerCase() : 'guest');
+    }
+
+    function getTimerState() {
+      if (!session) return {
+        hasClickedGroupLink: false,
+        isGroupVerified: false,
+        unlockAtMs: 0,
+        verifiedAtMs: 0,
+        robloxUsername: '',
+        robloxUserId: null,
+      };
+      return readLS(timerKey(), {
+        hasClickedGroupLink: false,
+        isGroupVerified: false,
+        unlockAtMs: 0,
+        verifiedAtMs: 0,
+        robloxUsername: '',
+        robloxUserId: null,
+      });
+    }
+
+    function setTimerState(next) {
+      writeLS(timerKey(), next);
+    }
+
+    function getCurrentUser() {
+      if (!session || session.role !== 'user') return null;
+      return users.find((u) => u.email.toLowerCase() === session.email.toLowerCase()) || null;
+    }
+
+    function formatTime(secs) {
+      const c = Math.max(0, Math.floor(secs));
+      return {
+        days: String(Math.floor(c / 86400)).padStart(2, '0'),
+        hours: String(Math.floor((c % 86400) / 3600)).padStart(2, '0'),
+        minutes: String(Math.floor((c % 3600) / 60)).padStart(2, '0'),
+        seconds: String(c % 60).padStart(2, '0'),
+      };
+    }
+
+    async function verifyRobloxMembershipAPI(username, targetGroupId, knownUserId) {
+      try {
+        if (location.protocol.startsWith('http')) {
+          try {
+            const apiRes = await fetch('/api/roblox/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+              cache: 'no-store',
+              body: JSON.stringify({ username: username.trim(), groupId: targetGroupId, knownUserId: knownUserId || null }),
+            });
+            if (apiRes.ok) {
+              const out = await apiRes.json();
+              if (out && out.status !== 'network_error') return out;
+            }
+          } catch {}
+        }
+
+        let userId = knownUserId || null;
+        let canonicalName = username.trim();
+
+        if (!userId) {
+          const userRes = await fetch(CORS_PROXY + encodeURIComponent('https://users.roblox.com/v1/usernames/users'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            cache: 'no-store',
+            body: JSON.stringify({ usernames: [canonicalName], excludeBannedUsers: true }),
+          });
+          if (!userRes.ok) return { status: 'network_error', message: 'Unable to reach Roblox API right now.' };
+          const userJson = await userRes.json();
+          const found = userJson?.data?.[0];
+          if (!found || typeof found.id !== 'number') {
+            return { status: 'user_not_found', message: 'Roblox username not found. Please check spelling and try again.' };
+          }
+          userId = found.id;
+          canonicalName = found.name || canonicalName;
+        }
+
+        const groupsRes = await fetch(CORS_PROXY + encodeURIComponent(`https://groups.roblox.com/v1/users/${userId}/groups/roles?_cb=${Date.now()}`), {
+          method: 'GET',
+          headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+          cache: 'no-store',
+        });
+        if (!groupsRes.ok) return { status: 'network_error', message: 'Unable to check Roblox groups right now.' };
+        const groupsJson = await groupsRes.json();
+        const list = Array.isArray(groupsJson?.data) ? groupsJson.data : [];
+        const joined = list.some((item) => Number(item?.group?.id) === Number(targetGroupId));
+
+        return joined
+          ? { status: 'verified', userId, username: canonicalName }
+          : { status: 'not_joined', userId, username: canonicalName };
+      } catch {
+        return { status: 'network_error', message: 'Network error while reaching Roblox API.' };
+      }
+    }
+
+    let isCheckingUnjoinHtml = false;
+    async function runUnjoinBackgroundCheck() {
+      const ts = getTimerState();
+      if (!session || !ts.isGroupVerified || !ts.robloxUsername) return true;
+      if (isCheckingUnjoinHtml) return true;
+      isCheckingUnjoinHtml = true;
+      try {
+        const outcome = await verifyRobloxMembershipAPI(ts.robloxUsername, groupSettings.groupId, ts.robloxUserId);
+        if (outcome.status === 'verified' && !ts.robloxUserId && outcome.userId) {
+          setTimerState({ ...ts, robloxUserId: outcome.userId });
+          return true;
+        }
+        if (outcome.status === 'not_joined') {
+          cancelWaitingOrder(ts.verifiedAtMs);
+          setTimerState({
+            hasClickedGroupLink: ts.hasClickedGroupLink,
+            isGroupVerified: false,
+            unlockAtMs: 0,
+            verifiedAtMs: 0,
+            robloxUsername: ts.robloxUsername,
+            robloxUserId: null,
+          });
+          selectedPaymentId = null;
+          $('modalErrorBox').textContent = UNJOINED_WARNING;
+          $('modalErrorBox').classList.remove('hidden');
+          renderCheckoutModal();
+          return false;
+        }
+        return true;
+      } finally {
+        isCheckingUnjoinHtml = false;
+      }
+    }
+
+    function renderHeader() {
+      const area = $('headerAuthArea');
+      const user = getCurrentUser();
+      $('heroGroupLink').href = groupSettings.groupUrl;
+      $('modalGroupLink').href = groupSettings.groupUrl;
+
+      if (!session) {
+        area.innerHTML = `<button id="openSignInBtn" type="button" class="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300">Sign In</button>`;
+        $('openSignInBtn').addEventListener('click', () => openAuthModal('signin'));
+      } else if (session.role === 'admin') {
+        area.innerHTML = `
+          <a href="#adminSection" class="inline-flex min-h-[40px] items-center rounded-lg bg-amber-400 px-3.5 py-2 text-xs font-semibold text-zinc-950">Admin Panel</a>
+          <button id="headerSignOutBtn" type="button" class="inline-flex min-h-[40px] items-center rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-white/5">Sign Out</button>
+        `;
+        $('headerSignOutBtn').addEventListener('click', signOut);
+      } else if (user) {
+        area.innerHTML = `
+          <button id="openProfileBtn" type="button" class="inline-flex min-h-[40px] items-center rounded-lg bg-[#131820] border border-white/15 px-3.5 py-2 text-xs font-semibold text-zinc-100 hover:border-amber-400/60">${user.name}</button>
+          <button id="headerSignOutBtn" type="button" class="inline-flex min-h-[40px] items-center rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-white/5">Sign Out</button>
+        `;
+        $('openProfileBtn').addEventListener('click', openProfileModal);
+        $('headerSignOutBtn').addEventListener('click', signOut);
+      }
+    }
+
+    function renderPackages() {
+      const grid = $('packagesGrid');
+      if (packages.length === 0) {
+        grid.innerHTML = `<div class="col-span-full rounded-xl bg-[#131820] border border-white/10 p-8 text-center text-sm text-zinc-400">No packages available.</div>`;
+        return;
+      }
+      grid.innerHTML = packages.map((pkg) => `
+        <article class="flex flex-col justify-between rounded-xl bg-[#131820] border border-white/10 p-6 space-y-6">
+          <div class="space-y-2">
+            <div class="text-xs text-zinc-400">${pkg.tierLabel || 'Robux Package'} &middot; ${pkg.deliveryNote || 'Group Payout'}</div>
+            <div class="flex items-baseline justify-between gap-4">
+              <h3 class="font-display text-2xl font-bold text-zinc-100">${pkg.title}</h3>
+              <div class="text-right">
+                <div class="font-mono text-lg font-semibold text-amber-300 tabular-nums">&#2547;${pkg.priceBdt}</div>
+                <div class="font-mono text-xs text-zinc-400">BDT</div>
+              </div>
+            </div>
+          </div>
+          <button type="button" data-buy-id="${pkg.id}" class="buy-btn w-full min-h-[44px] rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors">
+            Buy Now
+          </button>
+        </article>
+      `).join('');
+
+      document.querySelectorAll('.buy-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const pkg = packages.find((p) => p.id === btn.dataset.buyId);
+          if (pkg) {
+            selectedPackage = pkg;
+            if (!session) {
+              pendingCheckoutAfterAuth = true;
+              openAuthModal('signin', 'Please sign in or create an account to verify membership and buy Robux.');
+              return;
+            }
+            openCheckoutModal();
+          }
+        });
+      });
+    }
+
+    function renderAdminPanel() {
+      const isAdmin = session?.role === 'admin';
+      $('adminSection').classList.toggle('hidden', !isAdmin);
+      if (!isAdmin) return;
+
+      $('admGroupId').value = groupSettings.groupId;
+      $('admGroupUrl').value = groupSettings.groupUrl;
+
+      $('adminPackagesList').innerHTML = packages.map((pkg) => `
+        <div class="rounded-lg bg-[#0D1117] border border-white/10 px-4 py-3 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="font-display font-semibold text-zinc-100">${pkg.title}</div>
+              <div class="text-xs text-zinc-400 font-mono tabular-nums">&#2547;${pkg.priceBdt} BDT · ${pkg.deliveryNote}</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" data-toggle-edit="${pkg.id}" class="toggle-edit-btn rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10">
+                Edit Price
+              </button>
+              <button type="button" data-del-pkg="${pkg.id}" class="del-pkg-btn rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/20">
+                Delete
+              </button>
+            </div>
+          </div>
+          <div id="editRow-${pkg.id}" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10">
+            <input id="editBdt-${pkg.id}" type="number" min="1" value="${pkg.priceBdt}" class="min-h-[36px] rounded bg-[#090B0E] border border-white/15 px-2.5 py-1 text-xs text-zinc-100" />
+            <input id="editTag-${pkg.id}" type="text" value="${pkg.deliveryNote}" class="min-h-[36px] rounded bg-[#090B0E] border border-white/15 px-2.5 py-1 text-xs text-zinc-100" />
+            <button type="button" data-save-pkg="${pkg.id}" class="save-pkg-btn min-h-[36px] rounded bg-amber-400 px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-amber-300">Save Price</button>
+          </div>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.toggle-edit-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const row = $(`editRow-${btn.dataset.toggleEdit}`);
+          if (row) row.classList.toggle('hidden');
+        });
+      });
+
+      document.querySelectorAll('.save-pkg-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.savePkg;
+          const bdt = Number($(`editBdt-${id}`).value);
+          const tag = $(`editTag-${id}`).value.trim();
+          if (!bdt || bdt <= 0) return;
+          packages = packages.map((p) => p.id === id ? { ...p, priceBdt: bdt, deliveryNote: tag || p.deliveryNote } : p);
+          writeLS(KEYS.PACKAGES, packages);
+          if (selectedPackage?.id === id) {
+            selectedPackage = packages.find((p) => p.id === id) || selectedPackage;
+          }
+          $('admPkgNotice').textContent = `Updated package price to ৳${bdt} BDT.`;
+          $('admPkgNotice').classList.remove('hidden');
+          renderPackages();
+          renderAdminPanel();
+          if (location.protocol.startsWith('http')) {
+            fetch(`/api/packages/${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ priceBdt: bdt, deliveryNote: tag }),
+            }).then((r) => {
+              if (r.ok) {
+                const pushed = new Set(readLS('robuxora_html_pushed_pkg_ids', []));
+                pushed.add(id);
+                writeLS('robuxora_html_pushed_pkg_ids', Array.from(pushed));
+              }
+            }).catch(() => {});
+          }
+        });
+      });
+
+      document.querySelectorAll('.del-pkg-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const delId = btn.dataset.delPkg;
+          const delSet = new Set(readLS('robuxora_html_deleted_pkg_ids', []));
+          delSet.add(delId);
+          writeLS('robuxora_html_deleted_pkg_ids', Array.from(delSet));
+          packages = packages.filter((p) => p.id !== delId);
+          writeLS(KEYS.PACKAGES, packages);
+          $('admPkgNotice').textContent = 'Package deleted from storefront.';
+          $('admPkgNotice').classList.remove('hidden');
+          renderPackages();
+          renderAdminPanel();
+          if (location.protocol.startsWith('http')) {
+            fetch(`/api/packages/${encodeURIComponent(delId)}`, { method: 'DELETE' }).catch(() => {});
+          }
+        });
+      });
+
+      $('adminTabPackages').textContent = `Manage Packages (${packages.length})`;
+      $('adminTabOrders').textContent = `Manage Orders (${orders.length})`;
+
+      const q = (orderSearch || '').trim().toLowerCase();
+      const filteredOrders = orders.filter((ord) => {
+        if (orderFilter !== 'All' && ord.status !== orderFilter) return false;
+        if (!q) return true;
+        return (
+          (ord.orderNumber || '').toLowerCase().includes(q) ||
+          (ord.userName || '').toLowerCase().includes(q) ||
+          (ord.userEmail || '').toLowerCase().includes(q) ||
+          (ord.userPhone || '').toLowerCase().includes(q) ||
+          (ord.robloxUsername || '').toLowerCase().includes(q) ||
+          (ord.packageTitle || '').toLowerCase().includes(q) ||
+          (ord.paymentMethod || '').toLowerCase().includes(q)
+        );
+      });
+
+      const formatWait = (ord) => {
+        if (!ord.unlockAtMs || ord.unlockAtMs <= 0) return '';
+        const secsLeft = Math.max(0, Math.ceil((ord.unlockAtMs - Date.now()) / 1000));
+        if (secsLeft === 0) return '15-Day Hold Completed (Ready to Pay)';
+        const t = formatTime(secsLeft);
+        return `${t.days}d ${t.hours}h ${t.minutes}m ${t.seconds}s left`;
+      };
+
+      if (orders.length === 0) {
+        $('adminOrdersList').innerHTML = `<p class="text-sm text-zinc-500">No waiting customers or orders yet.</p>`;
+      } else if (filteredOrders.length === 0) {
+        $('adminOrdersList').innerHTML = `<p class="text-sm text-zinc-500">No orders match the current filter or search.</p>`;
+      } else {
+        const mobileCards = filteredOrders.map((ord) => {
+          const bdt = Number(ord.priceBdt) || Math.round(Number(ord.priceUsd || 0) * 118);
+          const statusCls = ord.status === 'Completed' || ord.status === 'Approved' ? 'text-emerald-400' : ord.status === 'Cancelled' ? 'text-red-400' : ord.status === 'Waiting' ? 'text-sky-300' : 'text-amber-300';
+          const statusLabel = ord.status === 'Waiting' ? 'Waiting (15-Day Hold)' : ord.status;
+          const waitText = formatWait(ord);
+          const createdLabel = ord.createdAt ? new Date(ord.createdAt).toLocaleString() : '';
+          return `
+            <div class="rounded-lg bg-[#0D1117] border border-white/10 p-4 space-y-3 text-xs">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="font-mono font-semibold text-amber-300">${ord.orderNumber}</div>
+                  <div class="font-medium text-zinc-100 mt-0.5">${ord.packageTitle} · &#2547;${bdt} BDT</div>
+                  <div class="text-zinc-400 mt-0.5">${ord.paymentMethod}</div>
+                </div>
+                <span class="font-semibold px-2.5 py-1 rounded bg-white/5 border border-white/10 ${statusCls}">${statusLabel}</span>
+              </div>
+              <div class="pt-2 border-t border-white/10 space-y-1 text-zinc-300">
+                <div>Customer: <span class="text-zinc-100 font-medium">${ord.userName}</span></div>
+                <div>Gmail: <span class="text-zinc-100 break-all">${ord.userEmail}</span></div>
+                <div>Phone: <span class="font-mono text-zinc-100">${ord.userPhone || 'Not provided'}</span></div>
+                <div>Roblox: <span class="font-mono text-zinc-100">${ord.robloxUsername || 'Verified Member'}</span>${typeof ord.robloxUserId === 'number' ? ` (ID: ${ord.robloxUserId})` : ''}</div>
+                ${createdLabel ? `<div>Time: <span class="text-zinc-400">${createdLabel}</span></div>` : ''}
+                ${waitText ? `<div class="rounded bg-[#131820] border border-white/10 px-2.5 py-1.5 font-mono text-amber-300 tabular-nums">15-Day Timer: ${waitText}</div>` : ''}
+              </div>
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                ${ord.status === 'Waiting' && ord.unlockAtMs > Date.now() ? `<button type="button" data-unlock-ord="${ord.id}" class="ord-unlock-btn col-span-2 min-h-[36px] rounded bg-amber-400/15 border border-amber-400/40 px-2.5 py-1.5 text-xs font-semibold text-amber-300">Unlock Timer Now (Allow Payment)</button>` : ''}
+                <button type="button" data-ord-id="${ord.id}" data-status="Approved" class="ord-status-btn min-h-[36px] rounded bg-sky-500/15 border border-sky-500/30 px-2.5 py-1.5 text-xs text-sky-300">Approve</button>
+                <button type="button" data-ord-id="${ord.id}" data-status="Completed" class="ord-status-btn min-h-[36px] rounded bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 text-xs text-emerald-300">Complete</button>
+                <button type="button" data-ord-id="${ord.id}" data-status="Cancelled" class="ord-status-btn min-h-[36px] rounded bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5 text-xs text-amber-300">Cancel</button>
+                <button type="button" data-del-ord="${ord.id}" class="del-ord-btn min-h-[36px] rounded bg-red-500/15 border border-red-500/30 px-2.5 py-1.5 text-xs text-red-300">Delete</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const desktopRows = filteredOrders.map((ord) => {
+          const bdt = Number(ord.priceBdt) || Math.round(Number(ord.priceUsd || 0) * 118);
+          const statusCls = ord.status === 'Completed' || ord.status === 'Approved' ? 'text-emerald-400' : ord.status === 'Cancelled' ? 'text-red-400' : ord.status === 'Waiting' ? 'text-sky-300' : 'text-amber-300';
+          const statusLabel = ord.status === 'Waiting' ? 'Waiting (15-Day Hold)' : ord.status;
+          const waitText = formatWait(ord);
+          const createdLabel = ord.createdAt ? new Date(ord.createdAt).toLocaleString() : '';
+          return `
+            <tr>
+              <td class="py-3 pr-4 align-top"><div class="font-mono text-amber-300 font-semibold">${ord.orderNumber}</div><div class="text-[11px] text-zinc-500">${createdLabel}</div></td>
+              <td class="py-3 pr-4 align-top"><div class="font-medium">${ord.userName}</div><div class="text-zinc-400">${ord.userEmail}</div><div class="font-mono text-[11px] text-zinc-400">${ord.userPhone || 'No phone'}</div></td>
+              <td class="py-3 pr-4 align-top"><div class="font-mono">${ord.robloxUsername || 'Verified Member'}</div>${waitText ? `<div class="font-mono text-[11px] text-amber-300 mt-0.5">${waitText}</div>` : ''}</td>
+              <td class="py-3 pr-4 align-top"><div>${ord.packageTitle}</div><div class="text-zinc-400">${ord.paymentMethod}</div></td>
+              <td class="py-3 pr-4 align-top font-mono tabular-nums">&#2547;${bdt} BDT</td>
+              <td class="py-3 pr-4 align-top font-semibold ${statusCls}">${statusLabel}</td>
+              <td class="py-3 align-top flex flex-wrap gap-1.5">
+                ${ord.status === 'Waiting' && ord.unlockAtMs > Date.now() ? `<button type="button" data-unlock-ord="${ord.id}" class="ord-unlock-btn rounded bg-amber-400/15 border border-amber-400/40 px-2.5 py-1 text-xs font-semibold text-amber-300">Unlock Timer</button>` : ''}
+                <button type="button" data-ord-id="${ord.id}" data-status="Approved" class="ord-status-btn rounded bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 text-xs text-sky-300">Approve</button>
+                <button type="button" data-ord-id="${ord.id}" data-status="Completed" class="ord-status-btn rounded bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs text-emerald-300">Complete</button>
+                <button type="button" data-ord-id="${ord.id}" data-status="Cancelled" class="ord-status-btn rounded bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-xs text-amber-300">Cancel</button>
+                <button type="button" data-del-ord="${ord.id}" class="del-ord-btn rounded bg-red-500/15 border border-red-500/30 px-2.5 py-1 text-xs text-red-300">Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        $('adminOrdersList').innerHTML = `
+          <div class="md:hidden space-y-3">${mobileCards}</div>
+          <div class="hidden md:block overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-white/10 text-zinc-400">
+                  <th class="py-2.5 pr-4">Order / Time</th>
+                  <th class="py-2.5 pr-4">Customer Details</th>
+                  <th class="py-2.5 pr-4">Roblox &amp; Hold Timer</th>
+                  <th class="py-2.5 pr-4">Package &amp; Payment</th>
+                  <th class="py-2.5 pr-4">Amount</th>
+                  <th class="py-2.5 pr-4">Status</th>
+                  <th class="py-2.5">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-white/10">${desktopRows}</tbody>
+            </table>
+          </div>
+        `;
+
+        document.querySelectorAll('.ord-unlock-btn').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.unlockOrd;
+            const nowMs = Date.now();
+            const found = orders.find((o) => o.id === id);
+            orders = orders.map((o) => o.id === id ? { ...o, unlockAtMs: nowMs } : o);
+            writeLS(KEYS.ORDERS, orders);
+            renderAdminPanel();
+            if (location.protocol.startsWith('http')) {
+              try {
+                const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ unlockAtMs: nowMs }),
+                });
+                if (res.status === 404 && found) {
+                  await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...found, unlockAtMs: nowMs }) });
+                }
+              } catch {}
+            }
+          });
+        });
+
+        document.querySelectorAll('.ord-status-btn').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.ordId;
+            const status = btn.dataset.status;
+            const found = orders.find((o) => o.id === id);
+            orders = orders.map((o) => o.id === id ? { ...o, status } : o);
+            writeLS(KEYS.ORDERS, orders);
+            renderAdminPanel();
+            if (location.protocol.startsWith('http')) {
+              try {
+                const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status }),
+                });
+                if (res.status === 404 && found) {
+                  await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...found, status }) });
+                }
+              } catch {}
+            }
+          });
+        });
+
+        document.querySelectorAll('.del-ord-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const id = btn.dataset.delOrd;
+            orders = orders.filter((o) => o.id !== id);
+            writeLS(KEYS.ORDERS, orders);
+            renderAdminPanel();
+            if (location.protocol.startsWith('http')) {
+              fetch(`/api/orders/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+            }
+          });
+        });
+      }
+    }
+
+    function renderCheckoutModal() {
+      const ts = getTimerState();
+      const secs = ts.isGroupVerified ? Math.max(0, Math.ceil((ts.unlockAtMs - Date.now()) / 1000)) : FIFTEEN_DAYS_SECONDS;
+      const isUnlocked = ts.isGroupVerified && secs === 0;
+      const t = formatTime(secs);
+
+      $('modalPkgSummary').textContent = `${selectedPackage.title} · ৳${selectedPackage.priceBdt} BDT`;
+      $('modalGroupHint').textContent = `Membership is verified automatically via the official Roblox Groups API (Group ID: ${groupSettings.groupId}). Leaving the group resets your 15-day timer.`;
+      $('modalGroupLink').href = groupSettings.groupUrl;
+      $('modalRobloxUser').value = ts.robloxUsername || '';
+      $('modalRobloxUser').disabled = ts.isGroupVerified;
+      $('modalLinkStatus').textContent = ts.hasClickedGroupLink ? 'Link Clicked' : 'Not Clicked Yet';
+      $('modalLinkStatus').className = `font-medium ${ts.hasClickedGroupLink ? 'text-emerald-400' : 'text-zinc-500'}`;
+
+      $('modalVerifyBtn').classList.toggle('hidden', ts.isGroupVerified);
+      $('modalVerifyBtn').disabled = isVerifyingApi;
+      $('modalVerifyBtn').textContent = isVerifyingApi ? 'Checking Roblox API...' : 'Verify Membership';
+      $('modalVerifiedBadge').classList.toggle('hidden', !ts.isGroupVerified);
+      $('adminUnlockTimerBtn').classList.toggle('hidden', !(session?.role === 'admin' && !isUnlocked));
+      $('modalResetBtn').classList.toggle('hidden', !ts.hasClickedGroupLink && !ts.isGroupVerified);
+
+      $('cdDays').textContent = t.days;
+      $('cdHours').textContent = t.hours;
+      $('cdMinutes').textContent = t.minutes;
+      $('cdSeconds').textContent = t.seconds;
+      const cdClass = isUnlocked ? 'text-emerald-400' : ts.isGroupVerified ? 'text-amber-300' : 'text-zinc-500';
+      ['cdDays', 'cdHours', 'cdMinutes', 'cdSeconds'].forEach((id) => {
+        $(id).className = `font-mono text-xl sm:text-2xl font-semibold tabular-nums ${cdClass}`;
+      });
+
+      $('modalTimerSubtitle').textContent = isUnlocked
+        ? '15-day waiting period complete. Payment is now unlocked.'
+        : ts.isGroupVerified
+        ? 'Verified Member! Timer active until 15-day hold completes.'
+        : 'Join the group and click Verify Membership to start the 15-day timer.';
+
+      $('paymentStatusDesc').textContent = isUnlocked
+        ? 'Payment unlocked. Choose a payment method and submit your order.'
+        : 'Complete group join and wait 15 days to unlock payment.';
+      $('paymentStatusDesc').className = `mt-1 text-xs font-medium ${isUnlocked ? 'text-emerald-400' : 'text-zinc-400'}`;
+      $('paymentBadge').textContent = isUnlocked ? 'Unlocked' : 'Unavailable - 15 days pending';
+      $('paymentBadge').className = `text-xs font-semibold ${isUnlocked ? 'text-emerald-400' : 'text-zinc-400'}`;
+
+      $('modalPaymentGrid').innerHTML = PAYMENT_METHODS.map((opt) => {
+        const active = selectedPaymentId === opt.id;
+        return `
+          <button type="button" ${!isUnlocked ? 'disabled' : ''} data-pay-id="${opt.id}"
+            class="pay-opt-btn flex flex-col justify-between text-left rounded-lg p-3.5 border ${
+              !isUnlocked
+                ? 'bg-[#131820]/50 border-white/5 text-zinc-500 cursor-not-allowed opacity-75'
+                : active
+                ? 'bg-[#131820] border-amber-400 text-zinc-100'
+                : 'bg-[#131820] border-white/10 text-zinc-200 hover:border-white/25 cursor-pointer'
+            }">
+            <div class="font-display text-xs font-semibold">${opt.name}</div>
+            <div class="mt-1.5 text-[11px] font-mono text-zinc-400">${opt.detail}</div>
+            <div class="mt-3 pt-2 border-t border-white/10 flex items-center justify-between text-[11px] w-full">
+              <span class="${!isUnlocked ? 'text-zinc-400' : active ? 'text-amber-300 font-semibold' : 'text-emerald-400'}">
+                ${!isUnlocked ? 'Unavailable - 15 days pending' : active ? 'Selected' : 'Available'}
+              </span>
+              <span class="font-mono tabular-nums text-zinc-400">&#2547;${selectedPackage.priceBdt}</span>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      if (isUnlocked) {
+        document.querySelectorAll('.pay-opt-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            selectedPaymentId = btn.dataset.payId;
+            renderCheckoutModal();
+          });
+        });
+      }
+
+      $('modalCheckoutBar').classList.toggle('hidden', !isUnlocked);
+      $('modalCheckoutBar').classList.toggle('flex', isUnlocked);
+      $('modalTotalLabel').textContent = `Total: ৳${selectedPackage.priceBdt} BDT`;
+      $('submitOrderBtn').disabled = !selectedPaymentId || isVerifyingApi;
+      $('submitOrderBtn').textContent = isVerifyingApi
+        ? 'Re-verifying Membership...'
+        : selectedPaymentId
+        ? 'Submit Order to Queue'
+        : 'Select a Payment Method';
+    }
+
+    function startTimerTick() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const ts = getTimerState();
+        if (ts.isGroupVerified && !$('checkoutModal').classList.contains('hidden')) {
+          renderCheckoutModal();
+        }
+        if (
+          session?.role === 'admin' &&
+          !$('adminSection').classList.contains('hidden') &&
+          !$('adminOrdersView').classList.contains('hidden')
+        ) {
+          renderAdminPanel();
+        }
+      }, 1000);
+    }
+
+    let pendingCheckoutAfterAuth = false;
+
+    function openAuthModal(mode, notice) {
+      if (notice) {
+        $('authErrorBox').textContent = notice;
+        $('authErrorBox').classList.remove('hidden');
+      } else {
+        $('authErrorBox').classList.add('hidden');
+      }
+      $('userSignInForm').classList.toggle('hidden', mode !== 'signin');
+      $('userSignUpForm').classList.toggle('hidden', mode !== 'signup');
+      $('adminSignInForm').classList.toggle('hidden', mode !== 'admin');
+      $('adminFooterStrip').classList.toggle('hidden', mode === 'admin');
+      $('authModalTitle').textContent = mode === 'signin' ? 'Customer Sign In' : mode === 'signup' ? 'Create an Account' : 'Admin Sign In';
+      $('authModalSubtitle').textContent = mode === 'signin' ? 'Sign in with your Gmail and password' : mode === 'signup' ? 'Register once to save your orders and 15-day timer' : 'Website owner access to manage packages & orders';
+      $('authModal').classList.remove('hidden');
+    }
+
+    function openProfileModal() {
+      const user = getCurrentUser();
+      if (!user) return;
+      $('profName').value = user.name;
+      $('profEmail').value = user.email;
+      $('profPhone').value = user.phone;
+      $('profPass').value = user.password;
+      $('profSavedMsg').classList.add('hidden');
+      $('profErrorMsg').classList.add('hidden');
+
+      const myOrders = orders.filter((o) => o.userEmail.toLowerCase() === user.email.toLowerCase());
+      $('userOrdersList').innerHTML = myOrders.length === 0
+        ? `<p class="text-xs text-zinc-500">No orders placed yet.</p>`
+        : myOrders.map((o) => `
+          <div class="rounded-lg bg-[#0D1117] border border-white/10 p-3 flex items-center justify-between text-xs">
+            <div><div class="font-semibold text-zinc-100">${o.packageTitle} · ${o.orderNumber}</div><div class="text-zinc-400">${o.paymentMethod}</div></div>
+            <div class="text-right"><div class="font-mono">&#2547;${Number(o.priceBdt) || Math.round(Number(o.priceUsd || 0) * 118)} BDT</div><div class="font-semibold ${o.status === 'Waiting' ? 'text-sky-300' : 'text-amber-300'}">${o.status === 'Waiting' ? 'Waiting (15-Day Hold)' : o.status}</div></div>
+          </div>
+        `).join('');
+      $('profileModal').classList.remove('hidden');
+    }
+
+    function openCheckoutModal() {
+      if (!session) {
+        pendingCheckoutAfterAuth = true;
+        openAuthModal('signin', 'Please sign in or create an account to verify membership and buy Robux.');
+        return;
+      }
+      $('modalErrorBox').classList.add('hidden');
+      $('modalReceiptBox').classList.add('hidden');
+      renderCheckoutModal();
+      $('checkoutModal').classList.remove('hidden');
+      startTimerTick();
+      void runUnjoinBackgroundCheck();
+    }
+
+    function signOut() {
+      session = null;
+      pendingCheckoutAfterAuth = false;
+      writeLS(KEYS.SESSION, null);
+      renderCheckoutModal();
+      $('checkoutModal').classList.add('hidden');
+      $('profileModal').classList.add('hidden');
+      renderHeader();
+      renderAdminPanel();
+    }
+
+    // Event Wiring
+    $('closeAuthBtn').addEventListener('click', () => {
+      pendingCheckoutAfterAuth = false;
+      $('authModal').classList.add('hidden');
+    });
+    $('goToSignUpBtn').addEventListener('click', () => openAuthModal('signup'));
+    $('backToSignInFromRegBtn').addEventListener('click', () => openAuthModal('signin'));
+    $('backToSignInFromAdmBtn').addEventListener('click', () => openAuthModal('signin'));
+    $('goToAdminBtn').addEventListener('click', () => openAuthModal('admin'));
+    $('closeProfileBtn').addEventListener('click', () => $('profileModal').classList.add('hidden'));
+    $('closeCheckoutBtn').addEventListener('click', () => $('checkoutModal').classList.add('hidden'));
+
+    $('userSignInForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = $('loginEmail').value.trim().toLowerCase();
+      const password = $('loginPassword').value;
+      const found = users.find((u) => u.email.toLowerCase() === email && u.password === password);
+      if (!found) {
+        $('authErrorBox').textContent = 'Invalid Gmail or password.';
+        $('authErrorBox').classList.remove('hidden');
+        return;
+      }
+      session = { role: 'user', email: found.email };
+      writeLS(KEYS.SESSION, session);
+      $('authModal').classList.add('hidden');
+      renderHeader();
+      renderAdminPanel();
+      if (pendingCheckoutAfterAuth) {
+        pendingCheckoutAfterAuth = false;
+        openCheckoutModal();
+      } else {
+        void runUnjoinBackgroundCheck();
+      }
+    });
+
+    $('userSignUpForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = $('regName').value.trim();
+      const email = $('regEmail').value.trim().toLowerCase();
+      const phone = $('regPhone').value.trim();
+      const password = $('regPassword').value;
+      if (email === ADMIN_EMAIL.toLowerCase()) {
+        $('authErrorBox').textContent = 'This email is reserved. Please use another Gmail address.';
+        $('authErrorBox').classList.remove('hidden');
+        return;
+      }
+      if (users.some((u) => u.email.toLowerCase() === email)) {
+        $('authErrorBox').textContent = 'An account with this Gmail already exists.';
+        $('authErrorBox').classList.remove('hidden');
+        return;
+      }
+      const newUser = { id: `usr-${Date.now()}`, name, email, phone, password, createdAt: new Date().toISOString() };
+      users.push(newUser);
+      writeLS(KEYS.USERS, users);
+      session = { role: 'user', email: newUser.email };
+      writeLS(KEYS.SESSION, session);
+      $('authModal').classList.add('hidden');
+      renderHeader();
+      renderAdminPanel();
+      if (location.protocol.startsWith('http')) {
+        fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newUser),
+        }).catch(() => {});
+      }
+      if (pendingCheckoutAfterAuth) {
+        pendingCheckoutAfterAuth = false;
+        openCheckoutModal();
+      }
+    });
+
+    $('adminSignInForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = $('adminEmail').value.trim().toLowerCase();
+      const pass = $('adminPassword').value;
+      if (email !== ADMIN_EMAIL.toLowerCase() || pass !== ADMIN_PASSWORD) {
+        $('authErrorBox').textContent = 'Invalid Admin email or password.';
+        $('authErrorBox').classList.remove('hidden');
+        return;
+      }
+      session = { role: 'admin', email: ADMIN_EMAIL };
+      writeLS(KEYS.SESSION, session);
+      $('adminEmail').value = '';
+      $('adminPassword').value = '';
+      $('authModal').classList.add('hidden');
+      renderHeader();
+      renderAdminPanel();
+      if (pendingCheckoutAfterAuth) {
+        pendingCheckoutAfterAuth = false;
+        openCheckoutModal();
+      }
+    });
+
+    $('profileForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const user = getCurrentUser();
+      if (!user) return;
+      $('profErrorMsg').classList.add('hidden');
+      $('profSavedMsg').classList.add('hidden');
+
+      const nextName = $('profName').value.trim();
+      const nextEmail = $('profEmail').value.trim().toLowerCase();
+      const nextPhone = $('profPhone').value.trim();
+      const nextPass = $('profPass').value;
+
+      if (nextEmail === ADMIN_EMAIL.toLowerCase()) {
+        $('profErrorMsg').textContent = 'That email is reserved. Please use a different Gmail address.';
+        $('profErrorMsg').classList.remove('hidden');
+        return;
+      }
+      if (users.some((u) => u.id !== user.id && u.email.toLowerCase() === nextEmail)) {
+        $('profErrorMsg').textContent = 'Another account already uses this Gmail address.';
+        $('profErrorMsg').classList.remove('hidden');
+        return;
+      }
+
+      const oldEmail = user.email;
+      user.name = nextName;
+      user.email = nextEmail;
+      user.phone = nextPhone;
+      user.password = nextPass;
+      writeLS(KEYS.USERS, users);
+      session = { role: 'user', email: user.email };
+      writeLS(KEYS.SESSION, session);
+
+      if (location.protocol.startsWith('http')) {
+        fetch(`/api/users/${encodeURIComponent(user.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            password: user.password,
+          }),
+        }).catch(() => {});
+      }
+
+      const matchedOrders = orders.filter((o) => o.userEmail.toLowerCase() === oldEmail.toLowerCase());
+      if (matchedOrders.length > 0) {
+        orders = orders.map((o) => o.userEmail.toLowerCase() === oldEmail.toLowerCase() ? { ...o, userEmail: user.email, userName: user.name, userPhone: user.phone } : o);
+        writeLS(KEYS.ORDERS, orders);
+        if (location.protocol.startsWith('http')) {
+          matchedOrders.forEach((mo) => {
+            fetch(`/api/orders/${encodeURIComponent(mo.id)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userEmail: user.email, userName: user.name, userPhone: user.phone }),
+            }).catch(() => {});
+          });
+        }
+      }
+      $('profSavedMsg').classList.remove('hidden');
+      renderHeader();
+    });
+
+    function switchAdminTab(tab) {
+      $('adminPackagesView').classList.toggle('hidden', tab !== 'packages');
+      $('adminOrdersView').classList.toggle('hidden', tab !== 'orders');
+      $('adminGroupForm').classList.toggle('hidden', tab !== 'group');
+      $('adminTabPackages').className = `rounded-md px-4 py-2 text-xs font-semibold ${tab === 'packages' ? 'bg-amber-400 text-zinc-950' : 'text-zinc-300 hover:text-white'}`;
+      $('adminTabOrders').className = `rounded-md px-4 py-2 text-xs font-semibold ${tab === 'orders' ? 'bg-amber-400 text-zinc-950' : 'text-zinc-300 hover:text-white'}`;
+      $('adminTabGroup').className = `rounded-md px-4 py-2 text-xs font-semibold ${tab === 'group' ? 'bg-amber-400 text-zinc-950' : 'text-zinc-300 hover:text-white'}`;
+    }
+
+    let orderFilter = 'All';
+    let orderSearch = '';
+
+    async function syncStoreFromHttp() {
+      if (!location.protocol.startsWith('http')) return;
+      try {
+        const res = await fetch('/api/store', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data.users) && data.users.length > 0) {
+          const map = new Map();
+          users.forEach((u) => map.set(u.id, u));
+          data.users.forEach((u) => map.set(u.id, u));
+          users = Array.from(map.values());
+          writeLS(KEYS.USERS, users);
+          renderHeader();
+        }
+        if (Array.isArray(data.orders)) {
+          const serverIds = new Set(data.orders.map((o) => o.id));
+          const pushed = new Set(readLS('robuxora_html_pushed_ids', []));
+          serverIds.forEach((id) => pushed.add(id));
+          const unsent = orders.filter((lo) => !serverIds.has(lo.id) && !pushed.has(lo.id));
+          for (const uo of unsent) {
+            try {
+              const postRes = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(uo) });
+              if (postRes.ok) pushed.add(uo.id);
+            } catch {}
+          }
+          writeLS('robuxora_html_pushed_ids', Array.from(pushed));
+          orders = [...unsent, ...data.orders];
+          writeLS(KEYS.ORDERS, orders);
+        }
+        if (session) {
+          const curTs = getTimerState();
+          if (curTs.isGroupVerified && curTs.verifiedAtMs) {
+            const m = orders.find((o) => o.userEmail.toLowerCase() === session.email.toLowerCase() && o.verifiedAtMs === curTs.verifiedAtMs);
+            if (m && m.unlockAtMs && m.unlockAtMs <= Date.now() && curTs.unlockAtMs > Date.now()) {
+              setTimerState({ ...curTs, unlockAtMs: m.unlockAtMs });
+              if (!$('checkoutModal').classList.contains('hidden')) renderCheckoutModal();
+            }
+          }
+        }
+        if (Array.isArray(data.packages)) {
+          const defaultPkgIds = new Set(DEFAULT_PACKAGES.map((p) => p.id));
+          const pushedPkgs = new Set(readLS('robuxora_html_pushed_pkg_ids', []));
+          const deletedPkgs = new Set(readLS('robuxora_html_deleted_pkg_ids', []));
+          for (const sp of data.packages) {
+            if (deletedPkgs.has(sp.id)) {
+              await fetch(`/api/packages/${encodeURIComponent(sp.id)}`, { method: 'DELETE' }).catch(() => {});
+            }
+          }
+          const filteredServerPkgs = data.packages.filter((sp) => !deletedPkgs.has(sp.id));
+          const serverPkgIds = new Set(filteredServerPkgs.map((p) => p.id));
+          const unsentPkgs = packages.filter((lp) => {
+            if (deletedPkgs.has(lp.id)) return false;
+            if (!serverPkgIds.has(lp.id)) {
+              return !pushedPkgs.has(lp.id) || !defaultPkgIds.has(lp.id);
+            }
+            return !pushedPkgs.has(lp.id);
+          });
+          for (const up of unsentPkgs) {
+            try {
+              const postRes = await fetch('/api/packages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(up),
+              });
+              if (postRes.ok) pushedPkgs.add(up.id);
+            } catch {}
+          }
+          writeLS('robuxora_html_pushed_pkg_ids', Array.from(pushedPkgs));
+          const pkgMap = new Map();
+          filteredServerPkgs.forEach((p) => pkgMap.set(p.id, p));
+          unsentPkgs.forEach((p) => pkgMap.set(p.id, p));
+          const merged = Array.from(pkgMap.values()).sort((a, b) => a.robux - b.robux);
+          if (merged.length > 0) {
+            packages = merged;
+            writeLS(KEYS.PACKAGES, packages);
+            renderPackages();
+          }
+        }
+        if (data.groupSettings && data.groupSettings.groupId) {
+          groupSettings = data.groupSettings;
+          writeLS(KEYS.GROUP_SETTINGS, groupSettings);
+        }
+        renderAdminPanel();
+      } catch {}
+    }
+
+    $('adminTabPackages').addEventListener('click', () => switchAdminTab('packages'));
+    $('adminTabOrders').addEventListener('click', () => {
+      switchAdminTab('orders');
+      void syncStoreFromHttp();
+    });
+    $('refreshOrdersBtn').addEventListener('click', () => void syncStoreFromHttp());
+    $('orderSearchInput').addEventListener('input', (e) => {
+      orderSearch = e.target.value;
+      renderAdminPanel();
+    });
+    document.querySelectorAll('.ord-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        orderFilter = btn.dataset.ordFilter;
+        document.querySelectorAll('.ord-filter-btn').forEach((b) => {
+          const active = b.dataset.ordFilter === orderFilter;
+          b.className = `ord-filter-btn rounded-md px-3 py-1.5 text-xs ${active ? 'font-semibold bg-amber-400 text-zinc-950' : 'font-medium bg-[#0D1117] border border-white/10 text-zinc-300'}`;
+        });
+        renderAdminPanel();
+      });
+    });
+    $('adminTabGroup').addEventListener('click', () => {
+      $('admGroupSavedMsg').classList.add('hidden');
+      switchAdminTab('group');
+    });
+
+    $('adminAddPackageForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const robux = Number($('admRobux').value);
+      const bdt = Number($('admBdt').value);
+      const note = $('admTag').value.trim() || 'Group Payout';
+      if (!robux || robux <= 0 || !bdt || bdt <= 0) return;
+      const newPkg = {
+        id: `pkg-${robux}-${Date.now()}`,
+        robux,
+        title: `${robux.toLocaleString()} Robux`,
+        tierLabel: 'Custom Bundle',
+        priceBdt: bdt,
+        deliveryNote: note,
+      };
+      const delSet = new Set(readLS('robuxora_html_deleted_pkg_ids', []));
+      if (delSet.delete(newPkg.id)) {
+        writeLS('robuxora_html_deleted_pkg_ids', Array.from(delSet));
+      }
+      packages.push(newPkg);
+      packages.sort((a, b) => a.robux - b.robux);
+      writeLS(KEYS.PACKAGES, packages);
+      e.target.reset();
+      $('admTag').value = 'Group Payout';
+      $('admPkgNotice').textContent = `"${newPkg.title}" saved to storefront!`;
+      $('admPkgNotice').classList.remove('hidden');
+      renderPackages();
+      renderAdminPanel();
+      if (location.protocol.startsWith('http')) {
+        try {
+          const res = await fetch('/api/packages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newPkg),
+          });
+          if (res.ok) {
+            const pushed = new Set(readLS('robuxora_html_pushed_pkg_ids', []));
+            pushed.add(newPkg.id);
+            writeLS('robuxora_html_pushed_pkg_ids', Array.from(pushed));
+          }
+        } catch {}
+      }
+    });
+
+    $('adminGroupForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const groupId = Number($('admGroupId').value);
+      const groupUrl = $('admGroupUrl').value.trim();
+      if (!groupId || !groupUrl) return;
+      groupSettings = { groupId, groupUrl };
+      writeLS(KEYS.GROUP_SETTINGS, groupSettings);
+      $('admGroupSavedMsg').classList.remove('hidden');
+      renderHeader();
+      if (location.protocol.startsWith('http')) {
+        fetch('/api/group-settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(groupSettings),
+        }).catch(() => {});
+      }
+    });
+
+    $('modalRobloxUser').addEventListener('input', (e) => {
+      const ts = getTimerState();
+      ts.robloxUsername = e.target.value.slice(0, 32);
+      ts.robloxUserId = null;
+      setTimerState(ts);
+    });
+
+    $('modalGroupLink').addEventListener('click', (e) => {
+      if (!session) {
+        e.preventDefault();
+        openAuthModal('signin', 'Please sign in or create an account to verify membership and buy Robux.');
+        return;
+      }
+      const ts = getTimerState();
+      ts.hasClickedGroupLink = true;
+      setTimerState(ts);
+      $('modalErrorBox').classList.add('hidden');
+      renderCheckoutModal();
+    });
+
+    function registerWaitingOrder(ts) {
+      if (!session || !ts.isGroupVerified || !ts.verifiedAtMs) return;
+      const user = getCurrentUser();
+      const userEmail = user ? user.email : session.email;
+      if (orders.some((o) => o.userEmail.toLowerCase() === userEmail.toLowerCase() && o.verifiedAtMs === ts.verifiedAtMs)) {
+        return;
+      }
+      const sanitizedEmail = userEmail.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const waitingOrder = {
+        id: `wait-${ts.verifiedAtMs}-${sanitizedEmail}`,
+        orderNumber: `BM-${Math.floor(1000 + Math.random() * 9000)}`,
+        userEmail,
+        userName: user ? user.name : 'Store Admin',
+        userPhone: user ? user.phone : '',
+        robloxUsername: ts.robloxUsername || 'Verified Member',
+        robloxUserId: ts.robloxUserId || null,
+        packageId: selectedPackage.id,
+        packageTitle: selectedPackage.title,
+        robuxAmount: selectedPackage.robux,
+        priceBdt: selectedPackage.priceBdt,
+        paymentMethod: 'Waiting 15-Day Hold',
+        status: 'Waiting',
+        verifiedAtMs: ts.verifiedAtMs,
+        unlockAtMs: ts.unlockAtMs,
+        createdAt: new Date(ts.verifiedAtMs).toISOString(),
+      };
+      orders.unshift(waitingOrder);
+      writeLS(KEYS.ORDERS, orders);
+      renderAdminPanel();
+      if (location.protocol.startsWith('http')) {
+        fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(waitingOrder),
+        }).catch(() => {});
+      }
+    }
+
+    function cancelWaitingOrder(verifiedAtMs) {
+      if (!session || !verifiedAtMs) return;
+      const user = getCurrentUser();
+      const userEmail = user ? user.email : session.email;
+      const match = orders.find((o) => o.userEmail.toLowerCase() === userEmail.toLowerCase() && o.verifiedAtMs === verifiedAtMs && o.status === 'Waiting');
+      if (!match) return;
+      orders = orders.map((o) => o.id === match.id ? { ...o, status: 'Cancelled' } : o);
+      writeLS(KEYS.ORDERS, orders);
+      renderAdminPanel();
+      if (location.protocol.startsWith('http')) {
+        fetch(`/api/orders/${encodeURIComponent(match.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'Cancelled' }),
+        }).catch(() => {});
+      }
+    }
+
+    $('modalVerifyBtn').addEventListener('click', async () => {
+      if (!session) {
+        openAuthModal('signin', 'Please sign in or create an account to verify membership and buy Robux.');
+        return;
+      }
+      const ts = getTimerState();
+      if (!ts.hasClickedGroupLink) {
+        $('modalErrorBox').textContent = CLICK_ERROR;
+        $('modalErrorBox').classList.remove('hidden');
+        return;
+      }
+      const cleanName = (ts.robloxUsername || '').trim();
+      if (!cleanName) {
+        $('modalErrorBox').textContent = 'Please enter your Roblox username before verifying membership.';
+        $('modalErrorBox').classList.remove('hidden');
+        return;
+      }
+
+      $('modalErrorBox').classList.add('hidden');
+      isVerifyingApi = true;
+      renderCheckoutModal();
+
+      const outcome = await verifyRobloxMembershipAPI(cleanName, groupSettings.groupId);
+      isVerifyingApi = false;
+
+      if (outcome.status === 'user_not_found') {
+        $('modalErrorBox').textContent = outcome.message;
+        $('modalErrorBox').classList.remove('hidden');
+        renderCheckoutModal();
+        return;
+      }
+
+      if (outcome.status === 'not_joined') {
+        $('modalErrorBox').textContent = NOT_JOINED_ERROR;
+        $('modalErrorBox').classList.remove('hidden');
+        renderCheckoutModal();
+        return;
+      }
+
+      if (outcome.status === 'network_error') {
+        if (cleanName.length < 3) {
+          $('modalErrorBox').textContent = 'Please enter a valid Roblox username (at least 3 characters).';
+          $('modalErrorBox').classList.remove('hidden');
+          renderCheckoutModal();
+          return;
+        }
+        const nowMs = Date.now();
+        const nextTs = {
+          hasClickedGroupLink: true,
+          isGroupVerified: true,
+          verifiedAtMs: nowMs,
+          unlockAtMs: nowMs + FIFTEEN_DAYS_SECONDS * 1000,
+          robloxUsername: cleanName,
+          robloxUserId: null,
+        };
+        setTimerState(nextTs);
+        registerWaitingOrder(nextTs);
+        renderCheckoutModal();
+        return;
+      }
+
+      const nowMs = Date.now();
+      const nextTs = {
+        hasClickedGroupLink: true,
+        isGroupVerified: true,
+        verifiedAtMs: nowMs,
+        unlockAtMs: nowMs + FIFTEEN_DAYS_SECONDS * 1000,
+        robloxUsername: outcome.username,
+        robloxUserId: outcome.userId,
+      };
+      setTimerState(nextTs);
+      registerWaitingOrder(nextTs);
+      renderCheckoutModal();
+    });
+
+    $('adminUnlockTimerBtn').addEventListener('click', async () => {
+      if (!session || session.role !== 'admin') return;
+      const ts = getTimerState();
+      const nowMs = Date.now();
+      const verifiedAt = ts.verifiedAtMs || nowMs;
+      setTimerState({
+        hasClickedGroupLink: true,
+        isGroupVerified: true,
+        verifiedAtMs: verifiedAt,
+        unlockAtMs: nowMs,
+        robloxUsername: (ts.robloxUsername || '').trim() || 'Admin Override',
+        robloxUserId: ts.robloxUserId || null,
+      });
+      $('modalErrorBox').classList.add('hidden');
+      renderCheckoutModal();
+      const matching = orders.find((o) => o.userEmail.toLowerCase() === session.email.toLowerCase() && o.verifiedAtMs === verifiedAt && o.status === 'Waiting');
+      if (matching) {
+        orders = orders.map((o) => o.id === matching.id ? { ...o, unlockAtMs: nowMs } : o);
+        writeLS(KEYS.ORDERS, orders);
+        renderAdminPanel();
+        if (location.protocol.startsWith('http')) {
+          fetch(`/api/orders/${encodeURIComponent(matching.id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ unlockAtMs: nowMs }),
+          }).catch(() => {});
+        }
+      }
+    });
+
+    $('modalResetBtn').addEventListener('click', () => {
+      const ts = getTimerState();
+      cancelWaitingOrder(ts.verifiedAtMs);
+      setTimerState({
+        hasClickedGroupLink: false,
+        isGroupVerified: false,
+        unlockAtMs: 0,
+        verifiedAtMs: 0,
+        robloxUsername: '',
+        robloxUserId: null,
+      });
+      selectedPaymentId = null;
+      $('modalErrorBox').classList.add('hidden');
+      $('modalReceiptBox').classList.add('hidden');
+      renderCheckoutModal();
+    });
+
+    $('submitOrderBtn').addEventListener('click', async () => {
+      if (!session) {
+        openAuthModal('signin', 'Please sign in or create an account to verify membership and buy Robux.');
+        return;
+      }
+      const ts = getTimerState();
+      const secs = ts.isGroupVerified ? Math.max(0, Math.ceil((ts.unlockAtMs - Date.now()) / 1000)) : FIFTEEN_DAYS_SECONDS;
+      if (!ts.isGroupVerified || secs > 0 || !selectedPaymentId) return;
+
+      if (ts.robloxUserId !== null) {
+        isVerifyingApi = true;
+        renderCheckoutModal();
+        const stillJoined = await runUnjoinBackgroundCheck();
+        isVerifyingApi = false;
+        if (!stillJoined) return;
+      }
+
+      const user = getCurrentUser();
+      const userEmail = user ? user.email : session.email;
+      const method = PAYMENT_METHODS.find((m) => m.id === selectedPaymentId)?.name || 'Selected Payment';
+      const existingWaiting = orders.find((o) => o.userEmail.toLowerCase() === userEmail.toLowerCase() && o.verifiedAtMs === ts.verifiedAtMs && o.status === 'Waiting');
+
+      if (existingWaiting) {
+        orders = orders.map((o) => o.id === existingWaiting.id ? {
+          ...o,
+          packageId: selectedPackage.id,
+          packageTitle: selectedPackage.title,
+          robuxAmount: selectedPackage.robux,
+          priceBdt: selectedPackage.priceBdt,
+          paymentMethod: method,
+          status: 'Pending',
+        } : o);
+        writeLS(KEYS.ORDERS, orders);
+        if (location.protocol.startsWith('http')) {
+          await fetch(`/api/orders/${encodeURIComponent(existingWaiting.id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              packageId: selectedPackage.id,
+              packageTitle: selectedPackage.title,
+              robuxAmount: selectedPackage.robux,
+              priceBdt: selectedPackage.priceBdt,
+              paymentMethod: method,
+              status: 'Pending',
+            }),
+          }).catch(() => {});
+        }
+        renderCheckoutModal();
+        $('modalReceiptBox').textContent = `Order #${existingWaiting.orderNumber} submitted via ${method}! Added to Admin Order Management.`;
+        $('modalReceiptBox').classList.remove('hidden');
+        renderAdminPanel();
+        return;
+      }
+
+      const orderNumber = `BM-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newOrder = {
+        id: `ord-${Date.now()}`,
+        orderNumber,
+        userEmail,
+        userName: user ? user.name : 'Store Admin',
+        userPhone: user ? user.phone : '',
+        robloxUsername: ts.robloxUsername || 'Verified Member',
+        robloxUserId: ts.robloxUserId || null,
+        packageId: selectedPackage.id,
+        packageTitle: selectedPackage.title,
+        robuxAmount: selectedPackage.robux,
+        priceBdt: selectedPackage.priceBdt,
+        paymentMethod: method,
+        status: 'Pending',
+        verifiedAtMs: ts.verifiedAtMs || undefined,
+        unlockAtMs: ts.unlockAtMs || undefined,
+        createdAt: new Date().toISOString(),
+      };
+      orders.unshift(newOrder);
+      writeLS(KEYS.ORDERS, orders);
+      if (location.protocol.startsWith('http')) {
+        await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOrder),
+        }).catch(() => {});
+      }
+      renderCheckoutModal();
+      $('modalReceiptBox').textContent = `Order #${orderNumber} submitted via ${method}! Added to Admin Order Management.`;
+      $('modalReceiptBox').classList.remove('hidden');
+      renderAdminPanel();
+    });
+
+    renderHeader();
+    renderPackages();
+    renderAdminPanel();
+    startTimerTick();
+    const initialTs = getTimerState();
+    if (session && initialTs.isGroupVerified && initialTs.verifiedAtMs) {
+      const bfKey = `robuxora_wait_bf_html_v2_${session.email.toLowerCase()}_${initialTs.verifiedAtMs}`;
+      if (!localStorage.getItem(bfKey)) {
+        localStorage.setItem(bfKey, '1');
+        registerWaitingOrder(initialTs);
+      }
+    }
+    void syncStoreFromHttp();
+    void runUnjoinBackgroundCheck();
+    setInterval(() => {
+      void runUnjoinBackgroundCheck();
+      if (session?.role === 'admin' || getTimerState().isGroupVerified) {
+        void syncStoreFromHttp();
+      }
+    }, 15000);
+    window.addEventListener('focus', () => {
+      void runUnjoinBackgroundCheck();
+      void syncStoreFromHttp();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void runUnjoinBackgroundCheck();
+        void syncStoreFromHttp();
+      }
+    });
+
+    document.addEventListener('pointerdown', (e) => {
+      const btn = e.target && e.target.closest('button:not(:disabled), a[href], [role="button"]');
+      if (!btn) return;
+
+      const classList = (btn.className || '') + ' ' + (btn.getAttribute('class') || '');
+      const btnText = (btn.textContent || '').trim();
+      let shockwaveClass = 'shockwave-amber';
+      let rippleBg =
+        'radial-gradient(circle, rgba(255, 255, 255, 0.75) 0%, rgba(251, 191, 36, 0.5) 45%, transparent 70%)';
+
+      if (
+        classList.includes('red-') ||
+        classList.includes('rose-') ||
+        classList.includes('Delete') ||
+        btnText.includes('Delete') ||
+        btnText.includes('Cancel')
+      ) {
+        shockwaveClass = 'shockwave-red';
+        rippleBg =
+          'radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(248, 113, 113, 0.6) 45%, transparent 70%)';
+      } else if (
+        classList.includes('emerald-') ||
+        classList.includes('green-') ||
+        btnText.includes('Approve') ||
+        btnText.includes('Complete')
+      ) {
+        shockwaveClass = 'shockwave-emerald';
+        rippleBg =
+          'radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(52, 211, 153, 0.6) 45%, transparent 70%)';
+      } else if (
+        classList.includes('zinc-') ||
+        classList.includes('bg-[#131820]') ||
+        classList.includes('bg-[#090B0E]') ||
+        classList.includes('bg-white/') ||
+        classList.includes('border-white')
+      ) {
+        shockwaveClass = 'shockwave-neutral';
+        rippleBg =
+          'radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, rgba(203, 213, 225, 0.45) 45%, transparent 70%)';
+      }
+
+      btn.classList.remove(
+        'is-btn-clicked',
+        'shockwave-amber',
+        'shockwave-emerald',
+        'shockwave-red',
+        'shockwave-neutral'
+      );
+      void btn.offsetWidth;
+      btn.classList.add('is-btn-clicked', shockwaveClass);
+      setTimeout(() => {
+        btn.classList.remove(
+          'is-btn-clicked',
+          'shockwave-amber',
+          'shockwave-emerald',
+          'shockwave-red',
+          'shockwave-neutral'
+        );
+      }, 440);
+
+      try {
+        const rect = btn.getBoundingClientRect();
+        const ripple = document.createElement('span');
+        ripple.className = 'btn-dynamic-ripple';
+        ripple.style.background = rippleBg;
+        const diameter = Math.max(rect.width, rect.height) * 2;
+        let x = (e.clientX || (e.touches && e.touches[0]?.clientX) || 0) - rect.left - diameter / 2;
+        let y = (e.clientY || (e.touches && e.touches[0]?.clientY) || 0) - rect.top - diameter / 2;
+        if (!e.clientX && !e.clientY) {
+          x = rect.width / 2 - diameter / 2;
+          y = rect.height / 2 - diameter / 2;
+        }
+        ripple.style.width = `${diameter}px`;
+        ripple.style.height = `${diameter}px`;
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+        btn.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 580);
+      } catch (err) {}
+    }, { capture: true });
+  </script>
+</body>
+</html>

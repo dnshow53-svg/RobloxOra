@@ -1,0 +1,376 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user account record anchoring verification and order subcollections.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "displayName", "createdAt", "updatedAt"]
+    },
+    "VerificationState": {
+      "title": "VerificationState",
+      "description": "Persisted Roblox community group verification and 14-day countdown state for a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "packageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "robloxUsername": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 32
+        },
+        "hasClickedGroupLink": {
+          "type": "boolean"
+        },
+        "hasConfirmedCheckbox": {
+          "type": "boolean"
+        },
+        "isGroupVerified": {
+          "type": "boolean"
+        },
+        "unlockAtMs": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "packageId",
+        "robloxUsername",
+        "hasClickedGroupLink",
+        "hasConfirmedCheckbox",
+        "isGroupVerified",
+        "unlockAtMs",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RobuxOrder": {
+      "title": "RobuxOrder",
+      "description": "Completed Robux order queued for Roblox group payout.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9\\-]+$"
+        },
+        "packageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "packageTitle": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80
+        },
+        "robuxAmount": {
+          "type": "number"
+        },
+        "priceUsd": {
+          "type": "number"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 64
+        },
+        "robloxUsername": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 32
+        },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "completed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "orderNumber",
+        "packageId",
+        "packageTitle",
+        "robuxAmount",
+        "priceUsd",
+        "paymentMethod",
+        "robloxUsername",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StorePackage": {
+      "title": "StorePackage",
+      "description": "Public Robux storefront package managed by the store administrator.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "robux": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "tierLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "priceBdt": {
+          "type": "number"
+        },
+        "deliveryNote": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        },
+        "image": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "robux",
+        "title",
+        "tierLabel",
+        "priceBdt",
+        "deliveryNote",
+        "image",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StoreGroupSettings": {
+      "title": "StoreGroupSettings",
+      "description": "Official Roblox Community Group ID and link configured by the store administrator.",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "number"
+        },
+        "groupUrl": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 500
+        },
+        "availableRobux": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["groupId", "groupUrl", "updatedAt"]
+    },
+    "StoreOrder": {
+      "title": "StoreOrder",
+      "description": "Customer waiting or submitted Robux order managed in the Admin Control Panel.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9\\-]+$"
+        },
+        "userEmail": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "userName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "userPhone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "robloxUsername": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "robloxUserId": {
+          "type": "number"
+        },
+        "packageId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "packageTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "robuxAmount": {
+          "type": "number"
+        },
+        "priceBdt": {
+          "type": "number"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "transactionId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 32
+        },
+        "paymentVerified": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Waiting", "Pending", "Approved", "Completed", "Cancelled"]
+        },
+        "verifiedAtMs": {
+          "type": "number"
+        },
+        "unlockAtMs": {
+          "type": "number"
+        },
+        "createdAtIso": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orderNumber",
+        "userEmail",
+        "userName",
+        "userPhone",
+        "robloxUsername",
+        "robloxUserId",
+        "packageId",
+        "packageTitle",
+        "robuxAmount",
+        "priceBdt",
+        "paymentMethod",
+        "status",
+        "verifiedAtMs",
+        "unlockAtMs",
+        "createdAtIso",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User root document owned exclusively by the authenticated user."
+    },
+    "/users/{userId}/verifications/{verificationId}": {
+      "schema": { "$ref": "#/entities/VerificationState" },
+      "description": "User's persisted Roblox group verification and 14-day security timer document."
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/RobuxOrder" },
+      "description": "User's persisted Robux group payout order records."
+    },
+    "/packages/{packageId}": {
+      "schema": { "$ref": "#/entities/StorePackage" },
+      "description": "Publicly readable Robux packages managed exclusively by the store admin."
+    },
+    "/storeSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/StoreGroupSettings" },
+      "description": "Storefront configuration including target Roblox Group ID and link."
+    },
+    "/storeOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/StoreOrder" },
+      "description": "Admin-managed customer orders and waiting-hold entries."
+    }
+  }
+}

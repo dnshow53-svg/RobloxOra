@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RobuxOra — Official Robux Vault &amp; Group Payout Store</title>
+    <meta name="description" content="Dark-themed Robux package storefront with mandatory Roblox group verification, 15-day security countdown, and gated checkout." />
+    <meta property="og:title" content="RobuxOra — Official Robux Vault &amp; Group Payout Store" />
+    <meta property="og:description" content="Dark-themed Robux package storefront with mandatory Roblox group verification, 15-day security countdown, and gated checkout." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Outfit:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script>
+      try {
+        if (localStorage.getItem('robuxora_theme_v1') === 'light') {
+          document.documentElement.classList.add('theme-light');
+        }
+      } catch (e) {}
+      // Auto-reload safeguard for Instagram & WhatsApp webviews if load hangs
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          try {
+            const root = document.getElementById('root');
+            if (root && root.children.length === 0 && !sessionStorage.getItem('robuxora_reloaded')) {
+              sessionStorage.setItem('robuxora_reloaded', '1');
+              window.location.reload();
+            }
+          } catch (e) {}
+        }, 4000);
+      });
+    </script>
+  </head>
+  <body class="bg-[#090B0E] text-zinc-100 antialiased selection:bg-amber-400/20 selection:text-amber-300">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
