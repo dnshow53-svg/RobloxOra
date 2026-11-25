@@ -8,7 +8,6 @@ import {
   Shield,
   Sun,
   User,
-  UserPlus,
   X,
 } from 'lucide-react';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -2083,24 +2082,14 @@ export default function App() {
             </button>
 
             {!session && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleOpenAuth('signin')}
-                  className="inline-flex min-h-[36px] sm:min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#131820] px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-zinc-200 hover:border-amber-400/60 hover:text-zinc-100 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                >
-                  <LogIn className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
-                  <span>Sign In</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenAuth('signup')}
-                  className="inline-flex min-h-[36px] sm:min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                >
-                  <UserPlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                  <span>Sign Up</span>
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => handleOpenAuth('signin')}
+                className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Sign In</span>
+              </button>
             )}
 
             {currentUser && (

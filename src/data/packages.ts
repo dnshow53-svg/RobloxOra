@@ -94,7 +94,7 @@ export const ROBLOX_GROUP_URL =
   'https://www.roblox.com/communities/401717676/Velvet-Visions-Studio#!/about';
 
 export const ADMIN_EMAIL = 'dnshow53@gmail.com';
-export const ADMIN_PASSWORD = '12345678';
+export const ADMIN_PASSWORD = 'abdullah1029@#£';
 
 // 15 days in seconds (15 * 24 * 60 * 60 = 1,296,000)
 export const FIFTEEN_DAYS_SECONDS = 15 * 24 * 60 * 60;
