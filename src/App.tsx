@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
+  CheckCircle2,
   ChevronDown,
   LogIn,
+  Mail,
   Moon,
   Shield,
   Sun,
@@ -28,6 +30,7 @@ import {
   VerifiedPaymentRecord,
   calculateUserTotalSpend,
   getUserLoyaltyTier,
+  normalizeOrderStatus,
 } from './data/packages';
 import {
   EMPTY_TIMER_STATE,
@@ -75,6 +78,7 @@ import { VerificationAndPaymentSection } from './components/VerificationAndPayme
 import { AuthModal, AuthModalMode } from './components/AuthModal';
 import { ProfileModal } from './components/ProfileModal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { CustomerOrdersSection } from './components/CustomerOrdersSection';
 import { LoyaltyTierBar } from './components/LoyaltyTierBar';
 import { RestockCountdownCard } from './components/RestockCountdownCard';
 
@@ -179,6 +183,7 @@ export default function App() {
     needed: number;
     packageTitle: string;
   } | null>(null);
+  const [dismissedConfirmBannerKey, setDismissedConfirmBannerKey] = useState<string>('');
 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
@@ -318,11 +323,30 @@ export default function App() {
   }, [packages, selectedPackageId]);
 
   const userOrders = useMemo(() => {
-    if (!currentUser) return [];
+    const targetEmail = currentUser?.email || (session?.role === 'user' ? session.email : '');
+    if (!targetEmail) return [];
     return orders.filter(
-      (o) => o.userEmail.toLowerCase() === currentUser.email.toLowerCase()
+      (o) => o.userEmail.toLowerCase() === targetEmail.toLowerCase()
     );
-  }, [orders, currentUser]);
+  }, [orders, currentUser, session]);
+
+  const confirmedUserOrders = useMemo(() => {
+    return userOrders.filter(
+      (o) => o.status === 'Approved' || o.status === 'Completed'
+    );
+  }, [userOrders]);
+
+  const latestConfirmedOrder = confirmedUserOrders[0] || null;
+  const confirmedBannerKey = latestConfirmedOrder
+    ? `${latestConfirmedOrder.id}:${latestConfirmedOrder.status}`
+    : '';
+
+  const liveReceiptOrder = useMemo(() => {
+    if (!orderReceipt) return null;
+    return (
+      orders.find((o) => o.orderNumber === orderReceipt.orderId) || null
+    );
+  }, [orders, orderReceipt]);
 
   // Refs for stable async callbacks & race-free server/Firestore synchronization
   const sessionRef = useRef(session);
@@ -347,6 +371,8 @@ export default function App() {
   const inFlightDeletedOrderIdsRef = useRef<Set<string>>(new Set());
   const inFlightGroupSettingsRef = useRef(false);
   const inFlightUserIdsRef = useRef<Set<string>>(new Set());
+  const syncEpochRef = useRef(0);
+  const cloudOrderIdsRef = useRef<Set<string>>(new Set());
 
   const updateTimerState = useCallback(
     (updater: (prev: VerificationTimerState) => VerificationTimerState) => {
@@ -414,6 +440,7 @@ export default function App() {
       };
 
       inFlightOrderIdsRef.current.add(waitingOrder.id);
+      syncEpochRef.current += 1;
       if (!existing) {
         const nextOrders = [
           waitingOrder,
@@ -436,6 +463,9 @@ export default function App() {
           } catch {
             // ignore
           }
+        }
+        if (isCloudConnectedRef.current) {
+          await upsertStoreOrder(waitingOrder).catch(() => {});
         }
       } catch {
         // Offline fallback preserved in localStorage
@@ -460,6 +490,7 @@ export default function App() {
     if (!matching) return;
 
     inFlightOrderIdsRef.current.add(matching.id);
+    syncEpochRef.current += 1;
     const updatedOrder: OrderRecord = { ...matching, status: 'Cancelled' };
     const nextOrders = loadOrders().map((o) =>
       o.id === matching.id ? updatedOrder : o
@@ -647,6 +678,7 @@ export default function App() {
   const syncFromServer = useCallback(async () => {
     if (isSyncingRef.current) return;
     isSyncingRef.current = true;
+    const startEpoch = syncEpochRef.current;
     try {
       const res = await fetch('/api/store', { cache: 'no-store' });
       if (!res.ok) return;
@@ -760,11 +792,19 @@ export default function App() {
           }
         }
       }
-      const serverOrders = rawServerOrders.filter(
-        (so) =>
-          !deletedOrderIds.has(so.id) &&
-          !inFlightDeletedOrderIdsRef.current.has(so.id)
-      );
+      const serverOrders = rawServerOrders
+        .filter(
+          (so) =>
+            !deletedOrderIds.has(so.id) &&
+            !inFlightDeletedOrderIdsRef.current.has(so.id)
+        )
+        .map((so) => ({
+          ...so,
+          status: normalizeOrderStatus(so.status),
+          priceBdt: Number(so.priceBdt) || 0,
+          robuxAmount: Number(so.robuxAmount) || 0,
+          paymentVerified: Boolean(so.paymentVerified),
+        }));
       for (const so of serverOrders) {
         markOrderIdPushed(so.id);
       }
@@ -797,7 +837,6 @@ export default function App() {
           const sanitized = emailLower.replace(/[^a-z0-9]/g, '');
           const id = `wait-${item.state.verifiedAtMs}-${sanitized}`;
           if (
-            pushedIds.has(id) ||
             inFlightDeletedOrderIdsRef.current.has(id) ||
             deletedOrderIds.has(id)
           ) {
@@ -827,13 +866,13 @@ export default function App() {
         }
       }
 
-      // Push any local orders that were never confirmed stored on the server
+      // Push any local orders missing from Express (always preserve Waiting timers if not deleted)
       const unsentLocalOrders = [
         ...discoveredWaitingOrders,
         ...localOrders.filter(
           (lo) =>
             !serverOrders.some((so) => so.id === lo.id) &&
-            !pushedIds.has(lo.id) &&
+            (!pushedIds.has(lo.id) || lo.status === 'Waiting') &&
             !deletedOrderIds.has(lo.id) &&
             !inFlightDeletedOrderIdsRef.current.has(lo.id)
         ),
@@ -853,23 +892,28 @@ export default function App() {
         }
       }
 
-      // Merge server orders + unsent local orders + active in-flight orders
+      // Merge server orders + unsent local orders + latest local orders if a local mutation happened mid-sync
+      const latestDeletedIds = loadDeletedOrderIds();
+      const latestLocalOrders =
+        syncEpochRef.current !== startEpoch ? loadOrders() : localOrders;
       const byId = new Map<string, OrderRecord>();
       for (const o of serverOrders) {
-        if (!deletedOrderIds.has(o.id) && !inFlightDeletedOrderIdsRef.current.has(o.id)) {
+        if (!latestDeletedIds.has(o.id) && !inFlightDeletedOrderIdsRef.current.has(o.id)) {
           byId.set(o.id, o);
         }
       }
       for (const uo of unsentLocalOrders) {
-        if (!deletedOrderIds.has(uo.id) && !inFlightDeletedOrderIdsRef.current.has(uo.id)) {
+        if (!latestDeletedIds.has(uo.id) && !inFlightDeletedOrderIdsRef.current.has(uo.id)) {
           byId.set(uo.id, uo);
         }
       }
-      for (const lo of localOrders) {
+      for (const lo of latestLocalOrders) {
         if (
-          inFlightOrderIdsRef.current.has(lo.id) &&
-          !deletedOrderIds.has(lo.id) &&
-          !inFlightDeletedOrderIdsRef.current.has(lo.id)
+          !latestDeletedIds.has(lo.id) &&
+          !inFlightDeletedOrderIdsRef.current.has(lo.id) &&
+          (inFlightOrderIdsRef.current.has(lo.id) ||
+            syncEpochRef.current !== startEpoch ||
+            !byId.has(lo.id))
         ) {
           byId.set(lo.id, lo);
         }
@@ -880,6 +924,15 @@ export default function App() {
       );
       setOrders(sortedOrders);
       saveOrders(sortedOrders);
+
+      // When Admin has Firestore connected, mirror newly synced customer timers/orders to Firestore
+      if (sessionRef.current?.role === 'admin' && isCloudConnectedRef.current) {
+        for (const ord of sortedOrders) {
+          if (!cloudOrderIdsRef.current.has(ord.id)) {
+            void upsertStoreOrder(ord).catch(() => {});
+          }
+        }
+      }
 
       // Sync Admin remote "Unlock Timer" back to the active customer's timer live
       const activeSession = sessionRef.current;
@@ -1032,14 +1085,17 @@ export default function App() {
   }, [syncFromServer]);
 
   useEffect(() => {
+    if (session) {
+      void syncFromServer();
+    }
     const poll = window.setInterval(
       () => {
         void syncFromServer();
       },
-      isAdmin ? 5000 : 10000
+      session ? 5000 : 10000
     );
     return () => window.clearInterval(poll);
-  }, [isAdmin, syncFromServer]);
+  }, [session, syncFromServer]);
 
   // Cloud Firestore real-time persistence subscriptions
   const syncAllToFirestore = useCallback(async () => {
@@ -1118,6 +1174,7 @@ export default function App() {
 
     const unsubOrders = subscribeStoreOrders((cloudOrders) => {
       const deletedIds = loadDeletedOrderIds();
+      const seenCloudIds = new Set<string>();
       const byId = new Map<string, OrderRecord>();
       for (const co of cloudOrders) {
         if (deletedIds.has(co.id) || inFlightDeletedOrderIdsRef.current.has(co.id)) {
@@ -1125,9 +1182,11 @@ export default function App() {
           void removeStoreOrder(co.id).catch(() => {});
           continue;
         }
+        seenCloudIds.add(co.id);
         byId.set(co.id, co);
         markOrderIdPushed(co.id);
       }
+      cloudOrderIdsRef.current = seenCloudIds;
       for (const lo of ordersRef.current) {
         if (deletedIds.has(lo.id) || inFlightDeletedOrderIdsRef.current.has(lo.id)) {
           continue;
@@ -1204,6 +1263,7 @@ export default function App() {
     setSession(nextSession);
     saveSession(nextSession);
     setAuthNotice(null);
+    void syncFromServer();
     if (pendingCheckoutAfterAuth) {
       setPendingCheckoutAfterAuth(false);
       setIsCheckoutModalOpen(true);
@@ -1397,27 +1457,99 @@ export default function App() {
     inFlightDeletedPackageIdsRef.current.delete(id);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
+  const handleUpdateOrderStatus = async (
+    orderId: string,
+    status: OrderStatus
+  ): Promise<{
+    emailStatus?: 'sent' | 'not_configured' | 'failed';
+    emailRecipient?: string;
+    emailError?: string;
+  }> => {
     inFlightOrderIdsRef.current.add(orderId);
-    const existingOrder = orders.find((o) => o.id === orderId);
-    const nextOrder = existingOrder ? { ...existingOrder, status } : null;
-    const next = orders.map((o) => (o.id === orderId ? { ...o, status } : o));
+    syncEpochRef.current += 1;
+    const isConfirmed = status === 'Approved' || status === 'Completed';
+    const existingOrder = ordersRef.current.find((o) => o.id === orderId);
+    const optimisticConfirmedAt = isConfirmed
+      ? existingOrder?.confirmedAt || new Date().toISOString()
+      : existingOrder?.confirmedAt;
+    const nextOrder: OrderRecord | null = existingOrder
+      ? { ...existingOrder, status, confirmedAt: optimisticConfirmedAt }
+      : null;
+    const next = ordersRef.current.map((o) =>
+      o.id === orderId
+        ? { ...o, status, confirmedAt: optimisticConfirmedAt }
+        : o
+    );
     setOrders(next);
     saveOrders(next);
+
+    let deliveryResult: {
+      emailStatus?: 'sent' | 'not_configured' | 'failed';
+      emailRecipient?: string;
+      emailError?: string;
+    } = {};
+
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, adminAction: true }),
       });
+
+      type OrderUpdatePayload = OrderRecord & {
+        emailDelivery?: {
+          sent?: boolean;
+          status?: 'sent' | 'not_configured' | 'failed';
+          recipient?: string;
+          sentAt?: string;
+          error?: string;
+        };
+      };
+
+      let savedPayload: OrderUpdatePayload | null = null;
+
       if (res.status === 404 && nextOrder) {
         const postRes = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(nextOrder),
+          body: JSON.stringify({ ...nextOrder, adminAction: true }),
         });
-        if (postRes.ok) markOrderIdPushed(orderId);
+        if (postRes.ok) {
+          markOrderIdPushed(orderId);
+          savedPayload = (await postRes.json().catch(() => null)) as OrderUpdatePayload | null;
+        }
+      } else if (res.ok) {
+        markOrderIdPushed(orderId);
+        savedPayload = (await res.json().catch(() => null)) as OrderUpdatePayload | null;
       }
+
+      if (savedPayload) {
+        const mergedSaved: OrderRecord = {
+          ...(nextOrder || savedPayload),
+          ...savedPayload,
+          status: normalizeOrderStatus(savedPayload.status),
+        };
+        const syncedOrders = ordersRef.current.map((o) =>
+          o.id === orderId ? mergedSaved : o
+        );
+        setOrders(syncedOrders);
+        saveOrders(syncedOrders);
+
+        if (savedPayload.emailDelivery) {
+          deliveryResult = {
+            emailStatus: savedPayload.emailDelivery.status,
+            emailRecipient: savedPayload.emailDelivery.recipient,
+            emailError: savedPayload.emailDelivery.error,
+          };
+        } else if (savedPayload.emailStatus) {
+          deliveryResult = {
+            emailStatus: savedPayload.emailStatus,
+            emailRecipient: mergedSaved.userEmail,
+            emailError: savedPayload.emailError,
+          };
+        }
+      }
+
       if (isCloudConnectedRef.current && nextOrder) {
         await upsertStoreOrder(nextOrder).catch(() => {});
       }
@@ -1426,11 +1558,105 @@ export default function App() {
     } finally {
       inFlightOrderIdsRef.current.delete(orderId);
     }
+    return deliveryResult;
+  };
+
+  const handleResendOrderEmail = async (
+    orderId: string
+  ): Promise<{
+    emailStatus?: 'sent' | 'not_configured' | 'failed';
+    emailRecipient?: string;
+    emailError?: string;
+  }> => {
+    const existingOrder = ordersRef.current.find((o) => o.id === orderId);
+    if (!existingOrder) {
+      return { emailStatus: 'failed', emailError: 'Order not found.' };
+    }
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: existingOrder.status,
+          adminAction: true,
+          resendConfirmationEmail: true,
+        }),
+      });
+      if (res.status === 404) {
+        const postRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...existingOrder, adminAction: true }),
+        });
+        const data = (await postRes.json().catch(() => null)) as {
+          emailDelivery?: {
+            status?: 'sent' | 'not_configured' | 'failed';
+            recipient?: string;
+            error?: string;
+          };
+          emailStatus?: 'sent' | 'not_configured' | 'failed';
+          emailSentAt?: string;
+          emailError?: string;
+        } | null;
+        if (data) {
+          const updatedList = ordersRef.current.map((o) =>
+            o.id === orderId
+              ? {
+                  ...o,
+                  emailStatus: data.emailDelivery?.status || data.emailStatus,
+                  emailSentAt: data.emailSentAt || o.emailSentAt,
+                  emailError: data.emailDelivery?.error || data.emailError,
+                }
+              : o
+          );
+          setOrders(updatedList);
+          saveOrders(updatedList);
+        }
+        return {
+          emailStatus: data?.emailDelivery?.status || data?.emailStatus || 'failed',
+          emailRecipient: data?.emailDelivery?.recipient || existingOrder.userEmail,
+          emailError: data?.emailDelivery?.error || data?.emailError,
+        };
+      }
+
+      const data = (await res.json().catch(() => null)) as {
+        emailDelivery?: {
+          status?: 'sent' | 'not_configured' | 'failed';
+          recipient?: string;
+          error?: string;
+        };
+        emailStatus?: 'sent' | 'not_configured' | 'failed';
+        emailSentAt?: string;
+        emailError?: string;
+      } | null;
+      if (data) {
+        const updatedList = ordersRef.current.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                emailStatus: data.emailDelivery?.status || data.emailStatus,
+                emailSentAt: data.emailSentAt || o.emailSentAt,
+                emailError: data.emailDelivery?.error || data.emailError,
+              }
+            : o
+        );
+        setOrders(updatedList);
+        saveOrders(updatedList);
+      }
+      return {
+        emailStatus: data?.emailDelivery?.status || data?.emailStatus || 'failed',
+        emailRecipient: data?.emailDelivery?.recipient || existingOrder.userEmail,
+        emailError: data?.emailDelivery?.error || data?.emailError,
+      };
+    } catch {
+      return { emailStatus: 'failed', emailError: 'Network error while contacting server.' };
+    }
   };
 
   const handleUnlockOrderTimer = async (orderId: string) => {
     const nowMs = Date.now();
     inFlightOrderIdsRef.current.add(orderId);
+    syncEpochRef.current += 1;
     const existingOrder = orders.find((o) => o.id === orderId);
     const nextOrder = existingOrder
       ? { ...existingOrder, unlockAtMs: nowMs }
@@ -1444,15 +1670,17 @@ export default function App() {
       const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unlockAtMs: nowMs }),
+        body: JSON.stringify({ unlockAtMs: nowMs, adminAction: true }),
       });
       if (res.status === 404 && nextOrder) {
         const postRes = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(nextOrder),
+          body: JSON.stringify({ ...nextOrder, adminAction: true }),
         });
         if (postRes.ok) markOrderIdPushed(orderId);
+      } else if (res.ok) {
+        markOrderIdPushed(orderId);
       }
       if (isCloudConnectedRef.current && nextOrder) {
         await upsertStoreOrder(nextOrder).catch(() => {});
@@ -1466,6 +1694,7 @@ export default function App() {
 
   const handleDeleteOrder = (orderId: string) => {
     inFlightDeletedOrderIdsRef.current.add(orderId);
+    syncEpochRef.current += 1;
     markOrderIdDeleted(orderId);
     const next = orders.filter((o) => o.id !== orderId);
     setOrders(next);
@@ -1916,6 +2145,7 @@ export default function App() {
         const nextOrders = orders.map((o) =>
           o.id === existingWaiting.id ? updatedOrder : o
         );
+        syncEpochRef.current += 1;
         setOrders(nextOrders);
         saveOrders(nextOrders);
         setOrderReceipt({
@@ -1977,6 +2207,7 @@ export default function App() {
       };
 
       inFlightOrderIdsRef.current.add(newOrder.id);
+      syncEpochRef.current += 1;
       const nextOrders = [newOrder, ...orders];
       setOrders(nextOrders);
       saveOrders(nextOrders);
@@ -2044,6 +2275,19 @@ export default function App() {
             >
               Payment
             </a>
+            {(currentUser || session?.role === 'user') && (
+              <a
+                href="#my-orders"
+                className="inline-flex items-center gap-1.5 hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+              >
+                <span>My Orders</span>
+                {confirmedUserOrders.length > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                    {confirmedUserOrders.length} Confirmed
+                  </span>
+                )}
+              </a>
+            )}
             <a
               href="#faq"
               className="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
@@ -2132,6 +2376,52 @@ export default function App() {
       </header>
 
       <main id="top" className="flex-1">
+        {/* LIVE CUSTOMER ORDER CONFIRMATION BANNER */}
+        {session?.role === 'user' &&
+          latestConfirmedOrder &&
+          confirmedBannerKey !== dismissedConfirmBannerKey && (
+            <div className="bg-emerald-500/10 border-b border-emerald-500/30">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-2.5 text-xs text-emerald-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" aria-hidden="true" />
+                  <span>
+                    <strong className="text-emerald-300 font-semibold">
+                      {latestConfirmedOrder.status === 'Completed'
+                        ? `Order #${latestConfirmedOrder.orderNumber} Delivered!`
+                        : `Order #${latestConfirmedOrder.orderNumber} Confirmed by Admin!`}
+                    </strong>{' '}
+                    {latestConfirmedOrder.packageTitle} for{' '}
+                    <span className="font-mono text-white">
+                      {latestConfirmedOrder.robloxUsername}
+                    </span>
+                    {latestConfirmedOrder.emailStatus === 'sent' && (
+                      <span className="inline-flex items-center gap-1 ml-1.5 text-emerald-300/90">
+                        <Mail className="w-3 h-3 inline" aria-hidden="true" />
+                        Email sent to {latestConfirmedOrder.userEmail}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <a
+                    href="#my-orders"
+                    className="inline-flex min-h-[34px] items-center justify-center rounded-lg bg-emerald-400 px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-emerald-300 transition-colors whitespace-nowrap"
+                  >
+                    View Order Status
+                  </a>
+                  <button
+                    type="button"
+                    aria-label="Dismiss confirmation banner"
+                    onClick={() => setDismissedConfirmBannerKey(confirmedBannerKey)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-emerald-200/80 hover:bg-emerald-500/20 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         {/* ADMIN CONTROL PANEL */}
         {isAdmin && (
           <AdminDashboard
@@ -2149,7 +2439,8 @@ export default function App() {
             onAddPackage={handleAddPackage}
             onUpdatePackage={handleUpdatePackage}
             onDeletePackage={handleDeletePackage}
-            onUpdateOrderStatus={(id, st) => void handleUpdateOrderStatus(id, st)}
+            onUpdateOrderStatus={(id, st) => handleUpdateOrderStatus(id, st)}
+            onResendOrderEmail={(id) => handleResendOrderEmail(id)}
             onUnlockOrderTimer={(id) => void handleUnlockOrderTimer(id)}
             onDeleteOrder={handleDeleteOrder}
             onAddVerifiedPayment={handleAddVerifiedPayment}
@@ -2466,6 +2757,7 @@ export default function App() {
           paymentError={paymentError}
           selectedPaymentId={selectedPaymentId}
           orderReceipt={orderReceipt}
+          liveReceiptOrder={liveReceiptOrder}
           onRequireSignIn={requireSignInPrompt}
           onGroupLinkClick={handleGroupLinkClick}
           onVerifyMembership={handleVerifyMembership}
@@ -2486,6 +2778,15 @@ export default function App() {
           }}
           onCompleteOrder={(trxId) => void handleCompleteOrder(trxId)}
         />
+
+        {/* LIVE CUSTOMER ORDER STATUS & CONFIRMATION TRACKER */}
+        {session?.role === 'user' && (
+          <CustomerOrdersSection
+            userEmail={currentUser ? currentUser.email : session.email}
+            orders={userOrders}
+            onRefresh={() => void syncFromServer()}
+          />
+        )}
 
         {/* 4. FAQ SECTION */}
         <section

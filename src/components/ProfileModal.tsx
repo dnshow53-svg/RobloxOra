@@ -514,39 +514,65 @@ export function ProfileModal({
                   </p>
                 ) : (
                   <div className="space-y-2.5">
-                    {orders.map((order) => (
-                      <div
-                        key={order.id}
-                        className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs"
-                      >
-                        <div>
-                          <div className="font-semibold text-zinc-100">
-                            {order.packageTitle} · <span className="font-mono text-amber-300">{order.orderNumber}</span>
+                    {orders.map((order) => {
+                      const isConfirmed =
+                        order.status === 'Approved' || order.status === 'Completed';
+                      const statusLabel =
+                        order.status === 'Completed'
+                          ? 'Confirmed & Delivered'
+                          : order.status === 'Approved'
+                          ? 'Confirmed by Admin'
+                          : order.status === 'Waiting'
+                          ? 'Waiting (15-Day Hold)'
+                          : order.status === 'Cancelled'
+                          ? 'Cancelled'
+                          : 'Awaiting Confirmation';
+                      return (
+                        <div
+                          key={order.id}
+                          className={`rounded-lg bg-[#0D1117] border p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
+                            isConfirmed ? 'border-emerald-500/35' : 'border-white/[0.08]'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-semibold text-zinc-100">
+                              {order.packageTitle} · <span className="font-mono text-amber-300">{order.orderNumber}</span>
+                            </div>
+                            <div className="text-zinc-400 mt-0.5">
+                              {order.paymentMethod} · Account: {order.robloxUsername || 'Guest Payout'}
+                            </div>
+                            {isConfirmed && (
+                              <div className="text-[11px] text-emerald-300/90 mt-1">
+                                {order.emailStatus === 'sent'
+                                  ? `Confirmation emailed to ${order.userEmail}`
+                                  : 'Confirmed by Admin'}
+                                {order.confirmedAt
+                                  ? ` · ${new Date(order.confirmedAt).toLocaleString()}`
+                                  : ''}
+                              </div>
+                            )}
                           </div>
-                          <div className="text-zinc-400 mt-0.5">
-                            {order.paymentMethod} · Account: {order.robloxUsername || 'Guest Payout'}
+                          <div className="text-right">
+                            <div className="font-mono tabular-nums text-zinc-200">
+                              ৳{order.priceBdt} BDT
+                            </div>
+                            <div
+                              className={`mt-0.5 font-semibold ${
+                                isConfirmed
+                                  ? 'text-emerald-400'
+                                  : order.status === 'Cancelled'
+                                  ? 'text-red-400'
+                                  : order.status === 'Waiting'
+                                  ? 'text-sky-300'
+                                  : 'text-amber-300'
+                              }`}
+                            >
+                              {statusLabel}
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-mono tabular-nums text-zinc-200">
-                            ৳{order.priceBdt} BDT
-                          </div>
-                          <div
-                            className={`mt-0.5 font-semibold ${
-                              order.status === 'Completed' || order.status === 'Approved'
-                                ? 'text-emerald-400'
-                                : order.status === 'Cancelled'
-                                ? 'text-red-400'
-                                : order.status === 'Waiting'
-                                ? 'text-sky-300'
-                                : 'text-amber-300'
-                            }`}
-                          >
-                            {order.status === 'Waiting' ? 'Waiting (15-Day Hold)' : order.status}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

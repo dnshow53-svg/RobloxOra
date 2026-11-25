@@ -26,8 +26,8 @@ import {
   ADMIN_EMAIL,
   GroupSettings,
   OrderRecord,
-  OrderStatus,
   RobuxPackage,
+  normalizeOrderStatus,
 } from './data/packages';
 
 const app = initializeApp(firebaseConfig);
@@ -545,7 +545,7 @@ export function subscribeStoreOrders(
                 ? d.transactionId
                 : undefined,
             paymentVerified: Boolean(d.paymentVerified),
-            status: (d.status as OrderStatus) || 'Pending',
+            status: normalizeOrderStatus(d.status),
             verifiedAtMs: Number(d.verifiedAtMs || 0) || undefined,
             unlockAtMs: Number(d.unlockAtMs || 0) || undefined,
             createdAt: String(d.createdAtIso || new Date().toISOString()),

@@ -3,11 +3,13 @@ import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  Clock,
   Cloud,
   Copy,
   ImagePlus,
   Loader2,
   LogOut,
+  Mail,
   PackagePlus,
   Pencil,
   RefreshCw,
@@ -32,6 +34,7 @@ import {
   RobuxPackage,
   VerifiedPaymentRecord,
   formatCountdown,
+  normalizeOrderStatus,
 } from '../data/packages';
 
 interface AdminDashboardProps {
@@ -49,7 +52,21 @@ interface AdminDashboardProps {
   onAddPackage: (pkg: RobuxPackage) => Promise<void> | void;
   onUpdatePackage: (pkg: RobuxPackage) => Promise<void> | void;
   onDeletePackage: (id: string) => Promise<void> | void;
-  onUpdateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  onUpdateOrderStatus: (
+    orderId: string,
+    status: OrderStatus
+  ) => Promise<{
+    emailStatus?: 'sent' | 'not_configured' | 'failed';
+    emailRecipient?: string;
+    emailError?: string;
+  } | void> | void;
+  onResendOrderEmail: (
+    orderId: string
+  ) => Promise<{
+    emailStatus?: 'sent' | 'not_configured' | 'failed';
+    emailRecipient?: string;
+    emailError?: string;
+  } | void> | void;
   onUnlockOrderTimer: (orderId: string) => void;
   onDeleteOrder: (orderId: string) => void;
   onAddVerifiedPayment: (payload: {
@@ -150,6 +167,7 @@ export function AdminDashboard({
   onUpdatePackage,
   onDeletePackage,
   onUpdateOrderStatus,
+  onResendOrderEmail,
   onUnlockOrderTimer,
   onDeleteOrder,
   onAddVerifiedPayment,
@@ -220,15 +238,21 @@ export function AdminDashboard({
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    if (activeTab !== 'orders') return;
     setNowMs(Date.now());
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [activeTab]);
+  }, []);
+
+  const normalizedOrders = useMemo(() => {
+    return orders.map((ord) => ({
+      ...ord,
+      status: normalizeOrderStatus(ord.status),
+    }));
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     const q = orderSearch.trim().toLowerCase();
-    return orders.filter((ord) => {
+    return normalizedOrders.filter((ord) => {
       if (orderFilter !== 'All' && ord.status !== orderFilter) return false;
       if (!q) return true;
       return (
@@ -242,7 +266,7 @@ export function AdminDashboard({
         ord.paymentMethod.toLowerCase().includes(q)
       );
     });
-  }, [orders, orderFilter, orderSearch]);
+  }, [normalizedOrders, orderFilter, orderSearch]);
 
   const userAvatarByEmail = useMemo(() => {
     const map = new Map<string, string>();
@@ -260,6 +284,48 @@ export function AdminDashboard({
     if (secsLeft === 0) return '15-Day Hold Completed (Ready to Pay)';
     const c = formatCountdown(secsLeft);
     return `${c.days}d ${c.hours}h ${c.minutes}m ${c.seconds}s left`;
+  };
+
+  const handleOrderStatusClick = async (order: OrderRecord, status: OrderStatus) => {
+    setOrderNotice(`Updating Order ${order.orderNumber} to ${status}...`);
+    const result = await onUpdateOrderStatus(order.id, status);
+    if (status === 'Approved' || status === 'Completed') {
+      if (result && result.emailStatus === 'sent') {
+        setOrderNotice(
+          `Order ${order.orderNumber} marked ${status} — confirmation email sent to ${result.emailRecipient || order.userEmail}.`
+        );
+      } else if (result && result.emailStatus === 'not_configured') {
+        setOrderNotice(
+          `Order ${order.orderNumber} marked ${status}. Customer sees it live in My Orders (set SMTP_USER & SMTP_PASS in Secrets to send emails).`
+        );
+      } else if (result && result.emailStatus === 'failed') {
+        setOrderNotice(
+          `Order ${order.orderNumber} marked ${status}. Email not sent: ${result.emailError || 'delivery error'}.`
+        );
+      } else {
+        setOrderNotice(`Order ${order.orderNumber} marked ${status}.`);
+      }
+      return;
+    }
+    setOrderNotice(`Order ${order.orderNumber} marked ${status}.`);
+  };
+
+  const handleResendEmailClick = async (order: OrderRecord) => {
+    setOrderNotice(`Sending confirmation email to ${order.userEmail}...`);
+    const result = await onResendOrderEmail(order.id);
+    if (result && result.emailStatus === 'sent') {
+      setOrderNotice(
+        `Confirmation email sent to ${result.emailRecipient || order.userEmail} for ${order.orderNumber}.`
+      );
+    } else if (result && result.emailStatus === 'not_configured') {
+      setOrderNotice(
+        `Email bot not configured yet — add SMTP_USER & SMTP_PASS (or RESEND_API_KEY) in Secrets.`
+      );
+    } else if (result && result.emailStatus === 'failed') {
+      setOrderNotice(
+        `Email delivery failed for ${order.orderNumber}: ${result.emailError || 'unknown error'}.`
+      );
+    }
   };
 
   useEffect(() => {
@@ -1176,30 +1242,30 @@ export function AdminDashboard({
             </div>
 
             {orderNotice && (
-              <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5 text-xs font-medium text-emerald-300">
-                <span className="inline-flex items-center gap-2">
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5 text-xs font-medium text-emerald-300">
+                <span className="inline-flex items-center gap-2 min-w-0">
                   <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  {orderNotice}
+                  <span className="truncate">{orderNotice}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setOrderNotice(null)}
-                  className="text-emerald-200/80 hover:text-white text-[11px]"
+                  className="text-emerald-200/80 hover:text-white text-[11px] shrink-0"
                 >
                   Dismiss
                 </button>
               </div>
             )}
 
-            {orders.length > 0 && (
+            {normalizedOrders.length > 0 && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {(['All', 'Waiting', 'Pending', 'Approved', 'Completed', 'Cancelled'] as const).map(
                     (st) => {
                       const count =
                         st === 'All'
-                          ? orders.length
-                          : orders.filter((o) => o.status === st).length;
+                          ? normalizedOrders.length
+                          : normalizedOrders.filter((o) => o.status === st).length;
                       return (
                         <button
                           key={st}
@@ -1235,7 +1301,7 @@ export function AdminDashboard({
               </div>
             )}
 
-            {orders.length === 0 ? (
+            {normalizedOrders.length === 0 ? (
               <div className="rounded-lg bg-[#0D1117] border border-white/[0.06] p-6 text-sm text-zinc-400 space-y-1">
                 <p className="font-medium text-zinc-300">No waiting customers or orders yet.</p>
                 <p className="text-xs text-zinc-500">
@@ -1252,6 +1318,10 @@ export function AdminDashboard({
                 <div className="md:hidden space-y-3">
                   {filteredOrders.map((order) => {
                     const waitText = formatWaitRemaining(order);
+                    const isTimerReady =
+                      typeof order.unlockAtMs === 'number' &&
+                      order.unlockAtMs > 0 &&
+                      order.unlockAtMs <= nowMs;
                     const createdLabel = new Date(order.createdAt).toLocaleString();
                     const customerAvatar =
                       userAvatarByEmail.get(order.userEmail.toLowerCase()) || '';
@@ -1289,7 +1359,7 @@ export function AdminDashboard({
                             )}
                           </div>
                           <span
-                            className={`font-semibold px-2.5 py-1 rounded bg-white/[0.04] border border-white/10 ${
+                            className={`font-semibold px-2.5 py-1 rounded bg-white/[0.04] border border-white/10 shrink-0 ${
                               order.status === 'Completed' || order.status === 'Approved'
                                 ? 'text-emerald-400'
                                 : order.status === 'Cancelled'
@@ -1302,6 +1372,24 @@ export function AdminDashboard({
                             {order.status === 'Waiting' ? 'Waiting (15-Day Hold)' : order.status}
                           </span>
                         </div>
+
+                        {waitText && (
+                          <div
+                            className={`rounded-lg border px-3 py-2 flex items-center justify-between gap-2 font-mono tabular-nums ${
+                              isTimerReady
+                                ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300'
+                                : 'bg-[#131820] border-amber-400/30 text-amber-300'
+                            }`}
+                          >
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-sans font-medium">
+                              <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                              {isTimerReady ? 'Hold Completed' : '15-Day Timer'}
+                            </span>
+                            <span className="font-semibold text-[11px]">
+                              {isTimerReady ? 'Ready to Pay' : waitText}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="pt-2 border-t border-white/[0.06] space-y-1.5 text-zinc-300">
                           <div className="flex items-center gap-2.5 pb-1">
@@ -1337,11 +1425,6 @@ export function AdminDashboard({
                           <div>
                             Submitted / Verified: <span className="text-zinc-400">{createdLabel}</span>
                           </div>
-                          {waitText && (
-                            <div className="rounded bg-[#131820] border border-white/10 px-2.5 py-1.5 font-mono text-amber-300 tabular-nums">
-                              15-Day Timer: {waitText}
-                            </div>
-                          )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 pt-1">
@@ -1364,20 +1447,14 @@ export function AdminDashboard({
                             )}
                           <button
                             type="button"
-                            onClick={() => {
-                              onUpdateOrderStatus(order.id, 'Approved');
-                              setOrderNotice(`Order ${order.orderNumber} marked Approved.`);
-                            }}
+                            onClick={() => void handleOrderStatusClick(order, 'Approved')}
                             className="min-h-[36px] inline-flex items-center justify-center gap-1 rounded bg-sky-500/15 border border-sky-500/30 px-2.5 py-1.5 text-xs font-medium text-sky-300 hover:bg-sky-500/25"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              onUpdateOrderStatus(order.id, 'Completed');
-                              setOrderNotice(`Order ${order.orderNumber} marked Completed.`);
-                            }}
+                            onClick={() => void handleOrderStatusClick(order, 'Completed')}
                             className="min-h-[36px] inline-flex items-center justify-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25"
                           >
                             <Check className="w-3 h-3" aria-hidden="true" />
@@ -1385,10 +1462,7 @@ export function AdminDashboard({
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              onUpdateOrderStatus(order.id, 'Cancelled');
-                              setOrderNotice(`Order ${order.orderNumber} marked Cancelled.`);
-                            }}
+                            onClick={() => void handleOrderStatusClick(order, 'Cancelled')}
                             className="min-h-[36px] inline-flex items-center justify-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25"
                           >
                             <XCircle className="w-3 h-3" aria-hidden="true" />
@@ -1405,6 +1479,18 @@ export function AdminDashboard({
                             <Trash2 className="w-3 h-3" aria-hidden="true" />
                             Delete
                           </button>
+                          {(order.status === 'Approved' || order.status === 'Completed') && (
+                            <button
+                              type="button"
+                              onClick={() => void handleResendEmailClick(order)}
+                              className="col-span-2 min-h-[36px] inline-flex items-center justify-center gap-1.5 rounded bg-white/[0.05] border border-white/15 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10"
+                            >
+                              <Mail className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+                              {order.emailStatus === 'sent'
+                                ? `Email Sent to ${order.userEmail} · Resend`
+                                : `Send Confirmation Email to ${order.userEmail}`}
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -1472,8 +1558,15 @@ export function AdminDashboard({
                                 </div>
                               )}
                               {waitText && (
-                                <div className="mt-1 font-mono text-[11px] text-amber-300 tabular-nums">
-                                  {waitText}
+                                <div
+                                  className={`mt-1 inline-flex items-center gap-1 font-mono text-[11px] tabular-nums ${
+                                    typeof order.unlockAtMs === 'number' && order.unlockAtMs <= nowMs
+                                      ? 'text-emerald-300'
+                                      : 'text-amber-300'
+                                  }`}
+                                >
+                                  <Clock className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                  <span>{waitText}</span>
                                 </div>
                               )}
                             </td>
@@ -1543,20 +1636,14 @@ export function AdminDashboard({
                                   )}
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    onUpdateOrderStatus(order.id, 'Approved');
-                                    setOrderNotice(`Order ${order.orderNumber} marked Approved.`);
-                                  }}
+                                  onClick={() => void handleOrderStatusClick(order, 'Approved')}
                                   className="inline-flex items-center gap-1 rounded bg-sky-500/15 border border-sky-500/30 px-2.5 py-1.5 text-xs font-medium text-sky-300 hover:bg-sky-500/25 transition-colors"
                                 >
                                   Approve
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    onUpdateOrderStatus(order.id, 'Completed');
-                                    setOrderNotice(`Order ${order.orderNumber} marked Completed.`);
-                                  }}
+                                  onClick={() => void handleOrderStatusClick(order, 'Completed')}
                                   className="inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25 transition-colors"
                                 >
                                   <Check className="w-3 h-3" aria-hidden="true" />
@@ -1564,10 +1651,7 @@ export function AdminDashboard({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    onUpdateOrderStatus(order.id, 'Cancelled');
-                                    setOrderNotice(`Order ${order.orderNumber} marked Cancelled.`);
-                                  }}
+                                  onClick={() => void handleOrderStatusClick(order, 'Cancelled')}
                                   className="inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
                                 >
                                   <XCircle className="w-3 h-3" aria-hidden="true" />
@@ -1584,6 +1668,16 @@ export function AdminDashboard({
                                   <Trash2 className="w-3 h-3" aria-hidden="true" />
                                   Delete
                                 </button>
+                                {(order.status === 'Approved' || order.status === 'Completed') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleResendEmailClick(order)}
+                                    className="inline-flex items-center gap-1 rounded bg-white/[0.06] border border-white/15 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10 transition-colors"
+                                  >
+                                    <Mail className="w-3 h-3 text-amber-400" aria-hidden="true" />
+                                    {order.emailStatus === 'sent' ? 'Email Sent · Resend' : 'Send Email'}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

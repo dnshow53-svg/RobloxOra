@@ -38,6 +38,16 @@ export type OrderStatus =
   | 'Completed'
   | 'Cancelled';
 
+export function normalizeOrderStatus(raw: unknown): OrderStatus {
+  const clean = String(raw || '').trim().toLowerCase();
+  if (clean === 'waiting') return 'Waiting';
+  if (clean === 'approved') return 'Approved';
+  if (clean === 'completed') return 'Completed';
+  if (clean === 'cancelled' || clean === 'canceled') return 'Cancelled';
+  if (clean === 'pending' || clean === 'queued') return 'Pending';
+  return 'Pending';
+}
+
 export interface OrderRecord {
   id: string;
   orderNumber: string;
@@ -57,6 +67,10 @@ export interface OrderRecord {
   verifiedAtMs?: number;
   unlockAtMs?: number;
   createdAt: string;
+  confirmedAt?: string;
+  emailStatus?: 'sent' | 'not_configured' | 'failed';
+  emailSentAt?: string;
+  emailError?: string;
 }
 
 export interface VerifiedPaymentRecord {

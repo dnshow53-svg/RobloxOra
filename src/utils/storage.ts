@@ -8,6 +8,7 @@ import {
   SessionState,
   TARGET_GROUP_ID,
   VerificationTimerState,
+  normalizeOrderStatus,
 } from '../data/packages';
 
 const KEYS = {
@@ -106,10 +107,19 @@ export function loadOrders(): OrderRecord[] {
     paymentMethod: ord.paymentMethod,
     transactionId: ord.transactionId,
     paymentVerified: Boolean(ord.paymentVerified),
-    status: ord.status,
+    status: normalizeOrderStatus(ord.status),
     verifiedAtMs: typeof ord.verifiedAtMs === 'number' ? ord.verifiedAtMs : undefined,
     unlockAtMs: typeof ord.unlockAtMs === 'number' ? ord.unlockAtMs : undefined,
     createdAt: ord.createdAt,
+    confirmedAt: typeof ord.confirmedAt === 'string' ? ord.confirmedAt : undefined,
+    emailStatus:
+      ord.emailStatus === 'sent' ||
+      ord.emailStatus === 'not_configured' ||
+      ord.emailStatus === 'failed'
+        ? ord.emailStatus
+        : undefined,
+    emailSentAt: typeof ord.emailSentAt === 'string' ? ord.emailSentAt : undefined,
+    emailError: typeof ord.emailError === 'string' ? ord.emailError : undefined,
   }));
 }
 

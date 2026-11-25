@@ -17,10 +17,12 @@ import {
 } from 'lucide-react';
 import {
   GroupSettings,
+  OrderRecord,
   PAYMENT_LOCKED_MESSAGE,
   PAYMENT_OPTIONS,
   RobuxPackage,
   formatCountdown,
+  normalizeOrderStatus,
 } from '../data/packages';
 import { RestockCountdownCard } from './RestockCountdownCard';
 
@@ -46,6 +48,7 @@ interface VerificationAndPaymentSectionProps {
     transactionId?: string;
     verified?: boolean;
   } | null;
+  liveReceiptOrder?: OrderRecord | null;
   onRequireSignIn: () => void;
   onGroupLinkClick: () => void;
   onVerifyMembership: () => void;
@@ -74,6 +77,7 @@ export function VerificationAndPaymentSection({
   paymentError = null,
   selectedPaymentId,
   orderReceipt,
+  liveReceiptOrder = null,
   onRequireSignIn,
   onGroupLinkClick,
   onVerifyMembership,
@@ -696,53 +700,94 @@ export function VerificationAndPaymentSection({
             </div>
           )}
 
-          {orderReceipt && (
-            <div
-              role="status"
-              className={`rounded-lg border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                orderReceipt.verified
-                  ? 'bg-emerald-500/10 border-emerald-500/30'
-                  : 'bg-amber-400/10 border-amber-400/30'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <CheckCircle2
-                  className={`w-5 h-5 shrink-0 mt-0.5 ${
-                    orderReceipt.verified ? 'text-emerald-400' : 'text-amber-400'
-                  }`}
-                  aria-hidden="true"
-                />
-                <div>
-                  <p
-                    className={`font-display text-base font-semibold ${
-                      orderReceipt.verified ? 'text-emerald-300' : 'text-amber-300'
+          {orderReceipt && (() => {
+            const liveStatus = liveReceiptOrder
+              ? normalizeOrderStatus(liveReceiptOrder.status)
+              : null;
+            const isConfirmedByAdmin =
+              Boolean(orderReceipt.verified) ||
+              liveStatus === 'Approved' ||
+              liveStatus === 'Completed';
+            const isDelivered = liveStatus === 'Completed';
+            const isCancelled = liveStatus === 'Cancelled';
+            return (
+              <div
+                role="status"
+                className={`rounded-lg border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                  isCancelled
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : isConfirmedByAdmin
+                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-amber-400/10 border-amber-400/30'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <CheckCircle2
+                    className={`w-5 h-5 shrink-0 mt-0.5 ${
+                      isCancelled
+                        ? 'text-red-400'
+                        : isConfirmedByAdmin
+                        ? 'text-emerald-400'
+                        : 'text-amber-400'
                     }`}
-                  >
-                    {orderReceipt.verified
-                      ? `Payment Verified & Order #${orderReceipt.orderId} Approved!`
-                      : `Order #${orderReceipt.orderId} Submitted (Pending 01764088123 Check)`}
-                  </p>
-                  {orderReceipt.transactionId && (
-                    <p className="mt-1 text-xs font-mono text-zinc-300">
-                      Method: {orderReceipt.method} · TrxID: {orderReceipt.transactionId}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <p
+                      className={`font-display text-base font-semibold ${
+                        isCancelled
+                          ? 'text-red-300'
+                          : isConfirmedByAdmin
+                          ? 'text-emerald-300'
+                          : 'text-amber-300'
+                      }`}
+                    >
+                      {isCancelled
+                        ? `Order #${orderReceipt.orderId} Cancelled`
+                        : isDelivered
+                        ? `Order #${orderReceipt.orderId} Confirmed & Delivered!`
+                        : isConfirmedByAdmin
+                        ? `Order #${orderReceipt.orderId} Confirmed by Admin!`
+                        : `Order #${orderReceipt.orderId} Submitted (Pending Admin Confirmation)`}
                     </p>
-                  )}
-                  <p className="mt-1.5 text-xs text-zinc-200 leading-relaxed font-medium">
-                    {orderReceipt.verified
-                      ? 'Your payment to 01764088123 has been verified! Please wait for 15 hours. After that time your Robux will be successfully transferred to your account.'
-                      : 'Order submitted! Once your payment to 01764088123 is confirmed in our Nagad/Rocket inbox, your Robux transfer begins. Please wait for 15 hours — after that time your Robux will be successfully transferred to your account.'}
-                  </p>
+                    {orderReceipt.transactionId && (
+                      <p className="mt-1 text-xs font-mono text-zinc-300">
+                        Method: {orderReceipt.method} · TrxID: {orderReceipt.transactionId}
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-xs text-zinc-200 leading-relaxed font-medium">
+                      {isCancelled
+                        ? 'This order was marked Cancelled by Admin.'
+                        : isDelivered
+                        ? 'Admin confirmed and completed your Robux delivery! Check your Roblox account balance.'
+                        : isConfirmedByAdmin
+                        ? `Your order has been confirmed by Admin${
+                            liveReceiptOrder?.emailStatus === 'sent'
+                              ? ` and a confirmation email was sent to ${liveReceiptOrder.userEmail}`
+                              : ''
+                          }! Your Robux payout is approved for delivery.`
+                        : 'Order submitted! Once Admin confirms your order (or matches your payment SMS), your confirmation status and email alert will update automatically.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <a
+                    href="#my-orders"
+                    className="min-h-[40px] inline-flex items-center justify-center rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap"
+                  >
+                    Track Live Status
+                  </a>
+                  <button
+                    type="button"
+                    onClick={onResetVerification}
+                    className="min-h-[40px] rounded-lg bg-zinc-900 border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-colors whitespace-nowrap"
+                  >
+                    Start Another Order
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onResetVerification}
-                className="min-h-[40px] rounded-lg bg-zinc-900 border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-colors whitespace-nowrap shrink-0"
-              >
-                Start Another Order
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
