@@ -1,0 +1,87 @@
+{
+  "packages": [
+    {
+      "id": "pkg-200-1794901392808",
+      "robux": 200,
+      "title": "200 Robux",
+      "tierLabel": "Custom Bundle",
+      "priceBdt": 270,
+      "deliveryNote": "Group Payout",
+      "image": ""
+    },
+    {
+      "id": "pkg-320-1794901406090",
+      "robux": 320,
+      "title": "320 Robux",
+      "tierLabel": "Custom Bundle",
+      "priceBdt": 400,
+      "deliveryNote": "Group Payout",
+      "image": ""
+    },
+    {
+      "id": "pkg-500-1794901414882",
+      "robux": 500,
+      "title": "500 Robux",
+      "tierLabel": "Custom Bundle",
+      "priceBdt": 600,
+      "deliveryNote": "Group Payout",
+      "image": ""
+    },
+    {
+      "id": "pkg-890-1794901424780",
+      "robux": 890,
+      "title": "890 Robux",
+      "tierLabel": "Custom Bundle",
+      "priceBdt": 1000,
+      "deliveryNote": "Group Payout",
+      "image": ""
+    }
+  ],
+  "deletedOrderIds": [
+    "ord-1794929046422",
+    "wait-1794853612014-salmakhan53rkgmailcom",
+    "wait-1794896455822-salmakhan53rkgmailcom",
+    "wait-1794896468419-salmakhan53rkgmailcom",
+    "wait-1794896492288-salmakhan53rkgmailcom"
+  ],
+  "orders": [
+    {
+      "id": "wait-1794929384856-salmakhan53rkgmailcom",
+      "orderNumber": "BM-8522",
+      "userEmail": "salmakhan53.rk@gmail.com",
+      "userName": "Dn show",
+      "userPhone": "01764088123",
+      "robloxUsername": "Robloxiane9q4k1y0a",
+      "robloxUserId": 8166996320,
+      "packageId": "pkg-500-1794901414882",
+      "packageTitle": "500 Robux",
+      "robuxAmount": 500,
+      "priceBdt": 600,
+      "paymentMethod": "Waiting 14-Day Hold",
+      "paymentVerified": false,
+      "status": "Waiting",
+      "verifiedAtMs": 1794929384856,
+      "unlockAtMs": 1796138984856,
+      "createdAt": "2026-11-17T15:29:44.856Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "usr-1794853148329",
+      "name": "Dn show",
+      "email": "salmakhan53.rk@gmail.com",
+      "phone": "01764088123",
+      "password": "1234",
+      "createdAt": "2026-11-16T18:19:08.329Z",
+      "avatar": "/uploads/pkg-1794978348544-2eiap.jpg",
+      "updatedAtMs": 1794978979817
+    }
+  ],
+  "groupSettings": {
+    "groupId": 401717676,
+    "groupUrl": "https://www.roblox.com/communities/401717676/Velvet-Visions-Studio#!/about",
+    "availableRobux": 0,
+    "updatedAtMs": 1794978528806
+  },
+  "verifiedPayments": []
+}
