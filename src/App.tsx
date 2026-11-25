@@ -8,6 +8,7 @@ import {
   Shield,
   Sun,
   User,
+  UserPlus,
   X,
 } from 'lucide-react';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -2013,10 +2014,10 @@ export default function App() {
     <div className="min-h-screen bg-[#090B0E] text-zinc-100 flex flex-col">
       {/* Top Bar Contract */}
       <header className="sticky top-0 z-40 bg-[#090B0E]/90 backdrop-blur-md border-b border-white/[0.08]">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-8">
           <a
             href="#top"
-            className="inline-flex items-center gap-2.5 font-display text-lg font-bold tracking-tight text-zinc-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded"
+            className="inline-flex items-center gap-2 font-display text-base sm:text-lg font-bold tracking-tight text-zinc-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded"
           >
             <RobuxMark className="w-5 h-5 text-amber-400 shrink-0" />
             <span>RobuxOra</span>
@@ -2052,7 +2053,7 @@ export default function App() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             <button
               type="button"
               onClick={toggleTheme}
@@ -2066,7 +2067,7 @@ export default function App() {
                   ? 'Switch to White Mode'
                   : 'Switch to Dark Mode'
               }
-              className="inline-flex h-10 w-10 sm:w-auto sm:px-3 items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#131820] text-zinc-200 hover:border-amber-400/60 hover:text-zinc-100 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              className="inline-flex h-9 w-9 sm:h-10 sm:w-auto sm:px-3 items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#131820] text-zinc-200 hover:border-amber-400/60 hover:text-zinc-100 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
             >
               {theme === 'dark' ? (
                 <>
@@ -2082,14 +2083,24 @@ export default function App() {
             </button>
 
             {!session && (
-              <button
-                type="button"
-                onClick={() => handleOpenAuth('signin')}
-                className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-              >
-                <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Sign In</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAuth('signin')}
+                  className="inline-flex min-h-[36px] sm:min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#131820] px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-zinc-200 hover:border-amber-400/60 hover:text-zinc-100 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
+                  <span>Sign In</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAuth('signup')}
+                  className="inline-flex min-h-[36px] sm:min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                >
+                  <UserPlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>Sign Up</span>
+                </button>
+              </>
             )}
 
             {currentUser && (

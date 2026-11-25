@@ -75,12 +75,8 @@ export function saveUsers(users: RegisteredUser[]): void {
 
 export function loadSession(): SessionState {
   const stored = safeRead<SessionState>(KEYS.SESSION, null);
-  if (!stored) {
-    const defaultGuest: SessionState = {
-      role: 'user',
-      email: 'guest@robuxora.com',
-    };
-    return defaultGuest;
+  if (!stored || stored.email === 'guest@robuxora.com') {
+    return null;
   }
   return stored;
 }
