@@ -9,7 +9,6 @@ import {
   ImagePlus,
   Loader2,
   LogOut,
-  Mail,
   PackagePlus,
   Pencil,
   RefreshCw,
@@ -52,21 +51,7 @@ interface AdminDashboardProps {
   onAddPackage: (pkg: RobuxPackage) => Promise<void> | void;
   onUpdatePackage: (pkg: RobuxPackage) => Promise<void> | void;
   onDeletePackage: (id: string) => Promise<void> | void;
-  onUpdateOrderStatus: (
-    orderId: string,
-    status: OrderStatus
-  ) => Promise<{
-    emailStatus?: 'sent' | 'not_configured' | 'failed';
-    emailRecipient?: string;
-    emailError?: string;
-  } | void> | void;
-  onResendOrderEmail: (
-    orderId: string
-  ) => Promise<{
-    emailStatus?: 'sent' | 'not_configured' | 'failed';
-    emailRecipient?: string;
-    emailError?: string;
-  } | void> | void;
+  onUpdateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void> | void;
   onUnlockOrderTimer: (orderId: string) => void;
   onDeleteOrder: (orderId: string) => void;
   onAddVerifiedPayment: (payload: {
@@ -167,7 +152,6 @@ export function AdminDashboard({
   onUpdatePackage,
   onDeletePackage,
   onUpdateOrderStatus,
-  onResendOrderEmail,
   onUnlockOrderTimer,
   onDeleteOrder,
   onAddVerifiedPayment,
@@ -287,45 +271,8 @@ export function AdminDashboard({
   };
 
   const handleOrderStatusClick = async (order: OrderRecord, status: OrderStatus) => {
-    setOrderNotice(`Updating Order ${order.orderNumber} to ${status}...`);
-    const result = await onUpdateOrderStatus(order.id, status);
-    if (status === 'Approved' || status === 'Completed') {
-      if (result && result.emailStatus === 'sent') {
-        setOrderNotice(
-          `Order ${order.orderNumber} marked ${status} — confirmation email sent to ${result.emailRecipient || order.userEmail}.`
-        );
-      } else if (result && result.emailStatus === 'not_configured') {
-        setOrderNotice(
-          `Order ${order.orderNumber} marked ${status}. Customer sees it live in My Orders (set SMTP_USER & SMTP_PASS in Secrets to send emails).`
-        );
-      } else if (result && result.emailStatus === 'failed') {
-        setOrderNotice(
-          `Order ${order.orderNumber} marked ${status}. Email not sent: ${result.emailError || 'delivery error'}.`
-        );
-      } else {
-        setOrderNotice(`Order ${order.orderNumber} marked ${status}.`);
-      }
-      return;
-    }
+    await onUpdateOrderStatus(order.id, status);
     setOrderNotice(`Order ${order.orderNumber} marked ${status}.`);
-  };
-
-  const handleResendEmailClick = async (order: OrderRecord) => {
-    setOrderNotice(`Sending confirmation email to ${order.userEmail}...`);
-    const result = await onResendOrderEmail(order.id);
-    if (result && result.emailStatus === 'sent') {
-      setOrderNotice(
-        `Confirmation email sent to ${result.emailRecipient || order.userEmail} for ${order.orderNumber}.`
-      );
-    } else if (result && result.emailStatus === 'not_configured') {
-      setOrderNotice(
-        `Email bot not configured yet — add SMTP_USER & SMTP_PASS (or RESEND_API_KEY) in Secrets.`
-      );
-    } else if (result && result.emailStatus === 'failed') {
-      setOrderNotice(
-        `Email delivery failed for ${order.orderNumber}: ${result.emailError || 'unknown error'}.`
-      );
-    }
   };
 
   useEffect(() => {
@@ -1479,18 +1426,6 @@ export function AdminDashboard({
                             <Trash2 className="w-3 h-3" aria-hidden="true" />
                             Delete
                           </button>
-                          {(order.status === 'Approved' || order.status === 'Completed') && (
-                            <button
-                              type="button"
-                              onClick={() => void handleResendEmailClick(order)}
-                              className="col-span-2 min-h-[36px] inline-flex items-center justify-center gap-1.5 rounded bg-white/[0.05] border border-white/15 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10"
-                            >
-                              <Mail className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
-                              {order.emailStatus === 'sent'
-                                ? `Email Sent to ${order.userEmail} · Resend`
-                                : `Send Confirmation Email to ${order.userEmail}`}
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
@@ -1668,16 +1603,6 @@ export function AdminDashboard({
                                   <Trash2 className="w-3 h-3" aria-hidden="true" />
                                   Delete
                                 </button>
-                                {(order.status === 'Approved' || order.status === 'Completed') && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleResendEmailClick(order)}
-                                    className="inline-flex items-center gap-1 rounded bg-white/[0.06] border border-white/15 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/10 transition-colors"
-                                  >
-                                    <Mail className="w-3 h-3 text-amber-400" aria-hidden="true" />
-                                    {order.emailStatus === 'sent' ? 'Email Sent · Resend' : 'Send Email'}
-                                  </button>
-                                )}
                               </div>
                             </td>
                           </tr>

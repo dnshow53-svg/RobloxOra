@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronDown,
   LogIn,
-  Mail,
   Moon,
   Shield,
   Sun,
@@ -1457,14 +1456,7 @@ export default function App() {
     inFlightDeletedPackageIdsRef.current.delete(id);
   };
 
-  const handleUpdateOrderStatus = async (
-    orderId: string,
-    status: OrderStatus
-  ): Promise<{
-    emailStatus?: 'sent' | 'not_configured' | 'failed';
-    emailRecipient?: string;
-    emailError?: string;
-  }> => {
+  const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
     inFlightOrderIdsRef.current.add(orderId);
     syncEpochRef.current += 1;
     const isConfirmed = status === 'Approved' || status === 'Completed';
@@ -1483,12 +1475,6 @@ export default function App() {
     setOrders(next);
     saveOrders(next);
 
-    let deliveryResult: {
-      emailStatus?: 'sent' | 'not_configured' | 'failed';
-      emailRecipient?: string;
-      emailError?: string;
-    } = {};
-
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
@@ -1496,18 +1482,7 @@ export default function App() {
         body: JSON.stringify({ status, adminAction: true }),
       });
 
-      type OrderUpdatePayload = OrderRecord & {
-        emailDelivery?: {
-          sent?: boolean;
-          status?: 'sent' | 'not_configured' | 'failed';
-          recipient?: string;
-          sentAt?: string;
-          error?: string;
-        };
-      };
-
-      let savedPayload: OrderUpdatePayload | null = null;
-
+      let savedPayload: OrderRecord | null = null;
       if (res.status === 404 && nextOrder) {
         const postRes = await fetch('/api/orders', {
           method: 'POST',
@@ -1516,11 +1491,11 @@ export default function App() {
         });
         if (postRes.ok) {
           markOrderIdPushed(orderId);
-          savedPayload = (await postRes.json().catch(() => null)) as OrderUpdatePayload | null;
+          savedPayload = (await postRes.json().catch(() => null)) as OrderRecord | null;
         }
       } else if (res.ok) {
         markOrderIdPushed(orderId);
-        savedPayload = (await res.json().catch(() => null)) as OrderUpdatePayload | null;
+        savedPayload = (await res.json().catch(() => null)) as OrderRecord | null;
       }
 
       if (savedPayload) {
@@ -1534,20 +1509,6 @@ export default function App() {
         );
         setOrders(syncedOrders);
         saveOrders(syncedOrders);
-
-        if (savedPayload.emailDelivery) {
-          deliveryResult = {
-            emailStatus: savedPayload.emailDelivery.status,
-            emailRecipient: savedPayload.emailDelivery.recipient,
-            emailError: savedPayload.emailDelivery.error,
-          };
-        } else if (savedPayload.emailStatus) {
-          deliveryResult = {
-            emailStatus: savedPayload.emailStatus,
-            emailRecipient: mergedSaved.userEmail,
-            emailError: savedPayload.emailError,
-          };
-        }
       }
 
       if (isCloudConnectedRef.current && nextOrder) {
@@ -1557,99 +1518,6 @@ export default function App() {
       // offline fallback preserved
     } finally {
       inFlightOrderIdsRef.current.delete(orderId);
-    }
-    return deliveryResult;
-  };
-
-  const handleResendOrderEmail = async (
-    orderId: string
-  ): Promise<{
-    emailStatus?: 'sent' | 'not_configured' | 'failed';
-    emailRecipient?: string;
-    emailError?: string;
-  }> => {
-    const existingOrder = ordersRef.current.find((o) => o.id === orderId);
-    if (!existingOrder) {
-      return { emailStatus: 'failed', emailError: 'Order not found.' };
-    }
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: existingOrder.status,
-          adminAction: true,
-          resendConfirmationEmail: true,
-        }),
-      });
-      if (res.status === 404) {
-        const postRes = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...existingOrder, adminAction: true }),
-        });
-        const data = (await postRes.json().catch(() => null)) as {
-          emailDelivery?: {
-            status?: 'sent' | 'not_configured' | 'failed';
-            recipient?: string;
-            error?: string;
-          };
-          emailStatus?: 'sent' | 'not_configured' | 'failed';
-          emailSentAt?: string;
-          emailError?: string;
-        } | null;
-        if (data) {
-          const updatedList = ordersRef.current.map((o) =>
-            o.id === orderId
-              ? {
-                  ...o,
-                  emailStatus: data.emailDelivery?.status || data.emailStatus,
-                  emailSentAt: data.emailSentAt || o.emailSentAt,
-                  emailError: data.emailDelivery?.error || data.emailError,
-                }
-              : o
-          );
-          setOrders(updatedList);
-          saveOrders(updatedList);
-        }
-        return {
-          emailStatus: data?.emailDelivery?.status || data?.emailStatus || 'failed',
-          emailRecipient: data?.emailDelivery?.recipient || existingOrder.userEmail,
-          emailError: data?.emailDelivery?.error || data?.emailError,
-        };
-      }
-
-      const data = (await res.json().catch(() => null)) as {
-        emailDelivery?: {
-          status?: 'sent' | 'not_configured' | 'failed';
-          recipient?: string;
-          error?: string;
-        };
-        emailStatus?: 'sent' | 'not_configured' | 'failed';
-        emailSentAt?: string;
-        emailError?: string;
-      } | null;
-      if (data) {
-        const updatedList = ordersRef.current.map((o) =>
-          o.id === orderId
-            ? {
-                ...o,
-                emailStatus: data.emailDelivery?.status || data.emailStatus,
-                emailSentAt: data.emailSentAt || o.emailSentAt,
-                emailError: data.emailDelivery?.error || data.emailError,
-              }
-            : o
-        );
-        setOrders(updatedList);
-        saveOrders(updatedList);
-      }
-      return {
-        emailStatus: data?.emailDelivery?.status || data?.emailStatus || 'failed',
-        emailRecipient: data?.emailDelivery?.recipient || existingOrder.userEmail,
-        emailError: data?.emailDelivery?.error || data?.emailError,
-      };
-    } catch {
-      return { emailStatus: 'failed', emailError: 'Network error while contacting server.' };
     }
   };
 
@@ -2269,31 +2137,6 @@ export default function App() {
             >
               Verification
             </a>
-            <a
-              href="#payment"
-              className="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
-            >
-              Payment
-            </a>
-            {(currentUser || session?.role === 'user') && (
-              <a
-                href="#my-orders"
-                className="inline-flex items-center gap-1.5 hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
-              >
-                <span>My Orders</span>
-                {confirmedUserOrders.length > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                    {confirmedUserOrders.length} Confirmed
-                  </span>
-                )}
-              </a>
-            )}
-            <a
-              href="#faq"
-              className="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
-            >
-              FAQ
-            </a>
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -2394,12 +2237,6 @@ export default function App() {
                     <span className="font-mono text-white">
                       {latestConfirmedOrder.robloxUsername}
                     </span>
-                    {latestConfirmedOrder.emailStatus === 'sent' && (
-                      <span className="inline-flex items-center gap-1 ml-1.5 text-emerald-300/90">
-                        <Mail className="w-3 h-3 inline" aria-hidden="true" />
-                        Email sent to {latestConfirmedOrder.userEmail}
-                      </span>
-                    )}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
@@ -2440,7 +2277,6 @@ export default function App() {
             onUpdatePackage={handleUpdatePackage}
             onDeletePackage={handleDeletePackage}
             onUpdateOrderStatus={(id, st) => handleUpdateOrderStatus(id, st)}
-            onResendOrderEmail={(id) => handleResendOrderEmail(id)}
             onUnlockOrderTimer={(id) => void handleUnlockOrderTimer(id)}
             onDeleteOrder={handleDeleteOrder}
             onAddVerifiedPayment={handleAddVerifiedPayment}
@@ -2855,13 +2691,6 @@ export default function App() {
               className="hover:text-zinc-300 transition-colors whitespace-nowrap"
             >
               Payment
-            </a>
-            <a
-              href="/robux-shop.html"
-              download="robux-shop.html"
-              className="text-amber-400 hover:text-amber-300 transition-colors whitespace-nowrap"
-            >
-              Download Single-File HTML
             </a>
           </div>
         </div>

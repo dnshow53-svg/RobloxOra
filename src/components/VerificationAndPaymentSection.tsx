@@ -761,12 +761,8 @@ export function VerificationAndPaymentSection({
                         : isDelivered
                         ? 'Admin confirmed and completed your Robux delivery! Check your Roblox account balance.'
                         : isConfirmedByAdmin
-                        ? `Your order has been confirmed by Admin${
-                            liveReceiptOrder?.emailStatus === 'sent'
-                              ? ` and a confirmation email was sent to ${liveReceiptOrder.userEmail}`
-                              : ''
-                          }! Your Robux payout is approved for delivery.`
-                        : 'Order submitted! Once Admin confirms your order (or matches your payment SMS), your confirmation status and email alert will update automatically.'}
+                        ? 'Your order has been confirmed by Admin! Your Robux payout is approved for delivery.'
+                        : 'Order submitted! Once Admin confirms your order (or matches your payment SMS), your confirmation status will update automatically below.'}
                     </p>
                   </div>
                 </div>

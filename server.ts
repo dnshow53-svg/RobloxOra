@@ -1,10 +1,8 @@
-import 'dotenv/config';
 import express from 'express';
 import type { Request, Response } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,9 +42,6 @@ interface StoreOrder {
   unlockAtMs?: number;
   createdAt: string;
   confirmedAt?: string;
-  emailStatus?: 'sent' | 'not_configured' | 'failed';
-  emailSentAt?: string;
-  emailError?: string;
 }
 
 interface VerifiedMfsPayment {
@@ -183,14 +178,6 @@ function ensureStoreFile(): StoreDatabase {
                 priceBdt: Number(o.priceBdt) || 0,
                 paymentVerified: Boolean(o.paymentVerified),
                 confirmedAt: typeof o.confirmedAt === 'string' ? o.confirmedAt : undefined,
-                emailStatus:
-                  o.emailStatus === 'sent' ||
-                  o.emailStatus === 'not_configured' ||
-                  o.emailStatus === 'failed'
-                    ? o.emailStatus
-                    : undefined,
-                emailSentAt: typeof o.emailSentAt === 'string' ? o.emailSentAt : undefined,
-                emailError: typeof o.emailError === 'string' ? o.emailError : undefined,
               };
             })
         : [],
@@ -251,219 +238,6 @@ const VALID_STATUSES = new Set<OrderStatus>([
   'Completed',
   'Cancelled',
 ]);
-
-interface EmailDeliveryResult {
-  sent: boolean;
-  status: 'sent' | 'not_configured' | 'failed';
-  recipient: string;
-  sentAt?: string;
-  error?: string;
-}
-
-function escapeHtml(raw: unknown): string {
-  return String(raw ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function sanitizeSingleLineHeader(raw: string): string {
-  return raw.replace(/[\r\n]+/g, ' ').trim();
-}
-
-function isValidEmailRecipient(raw: string): boolean {
-  const clean = sanitizeSingleLineHeader(raw);
-  return clean.length >= 3 && clean.length <= 160 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean);
-}
-
-async function sendOrderConfirmationEmail(
-  order: StoreOrder,
-  status: 'Approved' | 'Completed'
-): Promise<EmailDeliveryResult> {
-  const recipient = sanitizeSingleLineHeader(String(order.userEmail || '').toLowerCase());
-  if (!isValidEmailRecipient(recipient)) {
-    return {
-      sent: false,
-      status: 'failed',
-      recipient,
-      error: 'Customer account does not have a valid email address.',
-    };
-  }
-
-  const isCompleted = status === 'Completed';
-  const safeOrderNo = sanitizeSingleLineHeader(order.orderNumber || 'BM-0000');
-  const subject = `[RobuxOra] Order ${safeOrderNo} Confirmed — ${
-    isCompleted ? 'Robux Delivered' : 'Approved for Payout'
-  }`;
-
-  const rawAppUrl = String(process.env.APP_URL || '').trim();
-  const safeAppUrl =
-    /^https?:\/\//i.test(rawAppUrl) && rawAppUrl !== 'MY_APP_URL'
-      ? rawAppUrl.replace(/\/+$/, '')
-      : '';
-
-  const confirmedTimestamp = order.confirmedAt || new Date().toISOString();
-  const statusHeadline = isCompleted
-    ? 'Your Robux Order is Completed & Delivered!'
-    : 'Your Order Has Been Confirmed by Admin!';
-  const statusSubtext = isCompleted
-    ? `Your ${order.packageTitle} payout has been completed for Roblox account "${order.robloxUsername}".`
-    : `Great news! Our admin team has confirmed your order (${safeOrderNo}). Your ${order.packageTitle} payout is queued and will be transferred to "${order.robloxUsername}".`;
-
-  const html = `
-  <div style="background:#090B0E;color:#F4F4F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:32px 16px;">
-    <div style="max-width:560px;margin:0 auto;background:#131820;border:1px solid #27272A;border-radius:14px;overflow:hidden;">
-      <div style="padding:20px 24px;border-bottom:1px solid #27272A;background:#0D1117;">
-        <span style="display:inline-block;font-size:12px;font-weight:700;color:#FBBF24;letter-spacing:0.06em;text-transform:uppercase;">RobuxOra Order Bot</span>
-        <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#FFFFFF;">${escapeHtml(statusHeadline)}</h1>
-      </div>
-      <div style="padding:24px;font-size:14px;line-height:1.6;color:#D4D4D8;">
-        <p style="margin:0 0 14px;">Hello <strong style="color:#FFFFFF;">${escapeHtml(order.userName || 'Customer')}</strong>,</p>
-        <p style="margin:0 0 18px;">${escapeHtml(statusSubtext)}</p>
-        <div style="background:#090B0E;border:1px solid #27272A;border-radius:10px;padding:16px;margin-bottom:18px;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Order Number</td><td style="padding:5px 0;text-align:right;font-family:monospace;font-weight:700;color:#FBBF24;">${escapeHtml(safeOrderNo)}</td></tr>
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Status</td><td style="padding:5px 0;text-align:right;font-weight:700;color:#34D399;">${isCompleted ? 'Completed (Delivered)' : 'Confirmed (Approved)'}</td></tr>
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Package</td><td style="padding:5px 0;text-align:right;color:#FFFFFF;font-weight:600;">${escapeHtml(order.packageTitle)}</td></tr>
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Amount</td><td style="padding:5px 0;text-align:right;font-family:monospace;color:#FFFFFF;">৳${escapeHtml(order.priceBdt)} BDT</td></tr>
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Roblox Account</td><td style="padding:5px 0;text-align:right;font-family:monospace;color:#FFFFFF;">${escapeHtml(order.robloxUsername || 'Verified Member')}</td></tr>
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Payment</td><td style="padding:5px 0;text-align:right;color:#FFFFFF;">${escapeHtml(order.paymentMethod)}${order.transactionId ? ` (TrxID: ${escapeHtml(order.transactionId)})` : ''}</td></tr>
-            <tr><td style="padding:5px 0;color:#A1A1AA;">Confirmed At</td><td style="padding:5px 0;text-align:right;color:#A1A1AA;">${escapeHtml(new Date(confirmedTimestamp).toUTCString())}</td></tr>
-          </table>
-        </div>
-        ${
-          safeAppUrl
-            ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(safeAppUrl)}/#my-orders" style="display:inline-block;background:#FBBF24;color:#090B0E;text-decoration:none;font-weight:700;font-size:13px;padding:10px 18px;border-radius:8px;">View Order Status</a></p>`
-            : ''
-        }
-        <p style="margin:0;font-size:12px;color:#71717A;">You received this automated confirmation because your account signed in with ${escapeHtml(recipient)} on RobuxOra.</p>
-      </div>
-    </div>
-  </div>`;
-
-  const text = [
-    `Hello ${order.userName || 'Customer'},`,
-    '',
-    statusSubtext,
-    '',
-    `Order Number: ${safeOrderNo}`,
-    `Status: ${isCompleted ? 'Completed (Delivered)' : 'Confirmed (Approved)'}`,
-    `Package: ${order.packageTitle}`,
-    `Amount: ৳${order.priceBdt} BDT`,
-    `Roblox Username: ${order.robloxUsername || 'Verified Member'}`,
-    `Payment: ${order.paymentMethod}${order.transactionId ? ` (TrxID: ${order.transactionId})` : ''}`,
-    `Confirmed At: ${confirmedTimestamp}`,
-    safeAppUrl ? `View Order Status: ${safeAppUrl}/#my-orders` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-  const smtpUser = String(process.env.SMTP_USER || '').trim();
-  const rawSmtpPass = String(process.env.SMTP_PASS || '').trim();
-  const smtpFromRaw = String(process.env.SMTP_FROM || '').trim();
-
-  if (resendKey) {
-    try {
-      const fromHeader = smtpFromRaw || (smtpUser ? `RobuxOra <${smtpUser}>` : 'RobuxOra <onboarding@resend.dev>');
-      const apiRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: fromHeader,
-          to: [recipient],
-          subject,
-          html,
-          text,
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!apiRes.ok) {
-        const errBody = await apiRes.text().catch(() => '');
-        return {
-          sent: false,
-          status: 'failed',
-          recipient,
-          error: `Email service returned HTTP ${apiRes.status}${errBody ? `: ${errBody.slice(0, 140)}` : ''}`,
-        };
-      }
-      return {
-        sent: true,
-        status: 'sent',
-        recipient,
-        sentAt: new Date().toISOString(),
-      };
-    } catch (err) {
-      return {
-        sent: false,
-        status: 'failed',
-        recipient,
-        error: err instanceof Error ? err.message : 'Unable to send email via Resend API.',
-      };
-    }
-  }
-
-  if (smtpUser && rawSmtpPass) {
-    try {
-      const isGmail =
-        smtpUser.toLowerCase().endsWith('@gmail.com') ||
-        smtpUser.toLowerCase().endsWith('@googlemail.com');
-      const smtpHost = String(process.env.SMTP_HOST || '').trim() || (isGmail ? 'smtp.gmail.com' : '');
-      if (!smtpHost) {
-        return {
-          sent: false,
-          status: 'not_configured',
-          recipient,
-          error: 'SMTP_HOST is required when using a non-Gmail SMTP_USER.',
-        };
-      }
-      const smtpPort = Number(process.env.SMTP_PORT) || (smtpHost === 'smtp.gmail.com' ? 465 : 587);
-      const smtpPass = smtpHost === 'smtp.gmail.com' ? rawSmtpPass.replace(/\s+/g, '') : rawSmtpPass;
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
-      const fromHeader = smtpFromRaw || `RobuxOra <${smtpUser}>`;
-      await transporter.sendMail({
-        from: fromHeader,
-        to: recipient,
-        subject,
-        text,
-        html,
-      });
-      return {
-        sent: true,
-        status: 'sent',
-        recipient,
-        sentAt: new Date().toISOString(),
-      };
-    } catch (err) {
-      return {
-        sent: false,
-        status: 'failed',
-        recipient,
-        error: err instanceof Error ? err.message : 'SMTP delivery failed.',
-      };
-    }
-  }
-
-  return {
-    sent: false,
-    status: 'not_configured',
-    recipient,
-    error: 'Set SMTP_USER & SMTP_PASS (or RESEND_API_KEY) in Secrets to enable automated email sending.',
-  };
-}
 
 function normalizeMethodName(method: string): 'Nagad' | 'Rocket' | 'bKash' {
   const m = String(method || '').toLowerCase();
@@ -721,7 +495,7 @@ async function startServer() {
       return;
     }
     const nowIso = new Date().toISOString();
-    let created: StoreOrder = {
+    const created: StoreOrder = {
       id: String(body.id),
       orderNumber: String(body.orderNumber),
       userEmail: String(body.userEmail),
@@ -751,27 +525,15 @@ async function startServer() {
           : undefined,
     };
 
-    let emailDelivery: EmailDeliveryResult | undefined;
-    if (status === 'Approved' || status === 'Completed') {
-      emailDelivery = await sendOrderConfirmationEmail(created, status);
-      created = {
-        ...created,
-        emailStatus: emailDelivery.status,
-        emailSentAt: emailDelivery.sentAt,
-        emailError: emailDelivery.error,
-      };
-    }
-
     store.orders = [created, ...store.orders];
     writeStoreFile(store);
-    res.status(201).json(emailDelivery ? { ...created, emailDelivery } : created);
+    res.status(201).json(created);
   });
 
-  app.patch('/api/orders/:id', async (req: Request, res: Response) => {
+  app.patch('/api/orders/:id', (req: Request, res: Response) => {
     const id = req.params.id;
     const body = req.body as Partial<StoreOrder> & {
       adminAction?: boolean;
-      resendConfirmationEmail?: boolean;
     };
     if (body.status !== undefined && !VALID_STATUSES.has(body.status)) {
       res.status(400).json({ error: 'Invalid order status' });
@@ -784,7 +546,6 @@ async function startServer() {
     }
     const nextStatus = body.status ?? found.status;
     const isAdminAction = Boolean(body.adminAction);
-    const shouldResend = Boolean(body.resendConfirmationEmail);
     const nextRobux =
       typeof body.robuxAmount === 'number' && body.robuxAmount > 0
         ? body.robuxAmount
@@ -806,7 +567,7 @@ async function startServer() {
     }
     const nowIso = new Date().toISOString();
     const isConfirmedState = nextStatus === 'Approved' || nextStatus === 'Completed';
-    let updated: StoreOrder = {
+    const updated: StoreOrder = {
       ...found,
       status: nextStatus,
       paymentMethod:
@@ -854,22 +615,9 @@ async function startServer() {
       confirmedAt: isConfirmedState ? found.confirmedAt || nowIso : found.confirmedAt,
     };
 
-    const statusChangedToConfirmed =
-      isConfirmedState && found.status !== nextStatus;
-    let emailDelivery: EmailDeliveryResult | undefined;
-    if (statusChangedToConfirmed || (isConfirmedState && shouldResend)) {
-      emailDelivery = await sendOrderConfirmationEmail(updated, nextStatus);
-      updated = {
-        ...updated,
-        emailStatus: emailDelivery.status,
-        emailSentAt: emailDelivery.sentAt || updated.emailSentAt,
-        emailError: emailDelivery.error,
-      };
-    }
-
     store.orders = store.orders.map((o) => (o.id === id ? updated : o));
     writeStoreFile(store);
-    res.json(emailDelivery ? { ...updated, emailDelivery } : updated);
+    res.json(updated);
   });
 
   app.delete('/api/orders/:id', (req: Request, res: Response) => {
@@ -888,7 +636,7 @@ async function startServer() {
     res.json(store.verifiedPayments);
   });
 
-  app.post('/api/payments/ledger', async (req: Request, res: Response) => {
+  app.post('/api/payments/ledger', (req: Request, res: Response) => {
     const body = req.body as {
       method?: string;
       trxId?: string;
@@ -937,21 +685,10 @@ async function startServer() {
     if (matchingOrder) {
       entry.usedByOrderId = matchingOrder.orderNumber;
       const confirmedAt = matchingOrder.confirmedAt || new Date().toISOString();
-      const approvedOrder: StoreOrder = {
-        ...matchingOrder,
-        status: 'Approved',
-        paymentVerified: true,
-        confirmedAt,
-      };
-      const emailDelivery = await sendOrderConfirmationEmail(approvedOrder, 'Approved');
-      const finalApprovedOrder: StoreOrder = {
-        ...approvedOrder,
-        emailStatus: emailDelivery.status,
-        emailSentAt: emailDelivery.sentAt,
-        emailError: emailDelivery.error,
-      };
       store.orders = store.orders.map((o) =>
-        o.id === matchingOrder.id ? finalApprovedOrder : o
+        o.id === matchingOrder.id
+          ? { ...o, status: 'Approved', paymentVerified: true, confirmedAt }
+          : o
       );
     }
 
@@ -968,7 +705,7 @@ async function startServer() {
   });
 
   // Webhook endpoint for Android SMS Forwarder apps running on 01764088123
-  app.post('/api/payments/webhook', async (req: Request, res: Response) => {
+  app.post('/api/payments/webhook', (req: Request, res: Response) => {
     const body = req.body as {
       message?: string;
       text?: string;
@@ -1027,21 +764,10 @@ async function startServer() {
     if (matchingOrder) {
       entry.usedByOrderId = matchingOrder.orderNumber;
       const confirmedAt = matchingOrder.confirmedAt || new Date().toISOString();
-      const approvedOrder: StoreOrder = {
-        ...matchingOrder,
-        status: 'Approved',
-        paymentVerified: true,
-        confirmedAt,
-      };
-      const emailDelivery = await sendOrderConfirmationEmail(approvedOrder, 'Approved');
-      const finalApprovedOrder: StoreOrder = {
-        ...approvedOrder,
-        emailStatus: emailDelivery.status,
-        emailSentAt: emailDelivery.sentAt,
-        emailError: emailDelivery.error,
-      };
       store.orders = store.orders.map((o) =>
-        o.id === matchingOrder.id ? finalApprovedOrder : o
+        o.id === matchingOrder.id
+          ? { ...o, status: 'Approved', paymentVerified: true, confirmedAt }
+          : o
       );
     }
 

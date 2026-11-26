@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   Clock,
-  Mail,
   PackageCheck,
   RefreshCw,
   ShieldCheck,
@@ -81,14 +80,6 @@ export function CustomerOrdersSection({
                   {confirmedOrders[0].status === 'Completed'
                     ? `${confirmedOrders[0].packageTitle} has been marked Completed for Roblox account "${confirmedOrders[0].robloxUsername}".`
                     : `Admin confirmed your ${confirmedOrders[0].packageTitle} order for "${confirmedOrders[0].robloxUsername}". Your Robux payout is approved for delivery.`}
-                </p>
-                <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-emerald-200/90">
-                  <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                  <span>
-                    {confirmedOrders[0].emailStatus === 'sent'
-                      ? `Confirmation email sent to ${confirmedOrders[0].userEmail}`
-                      : `Confirmation registered for ${confirmedOrders[0].userEmail}`}
-                  </span>
                 </p>
               </div>
             </div>
@@ -255,21 +246,15 @@ export function CustomerOrdersSection({
                     </div>
                   </div>
 
-                  {isConfirmed && (
+                  {isConfirmed && order.confirmedAt && (
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-emerald-300/90 pt-1 border-t border-white/[0.06]">
                       <span className="inline-flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                        <span>
-                          {order.emailStatus === 'sent'
-                            ? `Email sent to ${order.userEmail}`
-                            : `Account email: ${order.userEmail}`}
-                        </span>
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span>Confirmed by Admin</span>
                       </span>
-                      {order.confirmedAt && (
-                        <span className="text-zinc-400">
-                          Confirmed {new Date(order.confirmedAt).toLocaleString()}
-                        </span>
-                      )}
+                      <span className="text-zinc-400">
+                        {new Date(order.confirmedAt).toLocaleString()}
+                      </span>
                     </div>
                   )}
                 </article>

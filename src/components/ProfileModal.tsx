@@ -543,9 +543,7 @@ export function ProfileModal({
                             </div>
                             {isConfirmed && (
                               <div className="text-[11px] text-emerald-300/90 mt-1">
-                                {order.emailStatus === 'sent'
-                                  ? `Confirmation emailed to ${order.userEmail}`
-                                  : 'Confirmed by Admin'}
+                                Confirmed by Admin
                                 {order.confirmedAt
                                   ? ` · ${new Date(order.confirmedAt).toLocaleString()}`
                                   : ''}

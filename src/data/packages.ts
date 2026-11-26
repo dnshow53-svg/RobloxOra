@@ -68,9 +68,6 @@ export interface OrderRecord {
   unlockAtMs?: number;
   createdAt: string;
   confirmedAt?: string;
-  emailStatus?: 'sent' | 'not_configured' | 'failed';
-  emailSentAt?: string;
-  emailError?: string;
 }
 
 export interface VerifiedPaymentRecord {

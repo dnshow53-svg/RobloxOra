@@ -112,14 +112,6 @@ export function loadOrders(): OrderRecord[] {
     unlockAtMs: typeof ord.unlockAtMs === 'number' ? ord.unlockAtMs : undefined,
     createdAt: ord.createdAt,
     confirmedAt: typeof ord.confirmedAt === 'string' ? ord.confirmedAt : undefined,
-    emailStatus:
-      ord.emailStatus === 'sent' ||
-      ord.emailStatus === 'not_configured' ||
-      ord.emailStatus === 'failed'
-        ? ord.emailStatus
-        : undefined,
-    emailSentAt: typeof ord.emailSentAt === 'string' ? ord.emailSentAt : undefined,
-    emailError: typeof ord.emailError === 'string' ? ord.emailError : undefined,
   }));
 }
 
