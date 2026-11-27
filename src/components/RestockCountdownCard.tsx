@@ -30,7 +30,7 @@ export function RestockCountdownCard({
 
   return (
     <div
-      className={`rounded-xl bg-[#090B0E] border border-red-500/35 ${
+      className={`rounded-2xl bg-[#110F1B] border border-red-500/35 ${
         compact ? 'p-4 space-y-3' : 'p-5 space-y-4'
       } shadow-lg shadow-red-500/5`}
     >
@@ -66,12 +66,12 @@ export function RestockCountdownCard({
           ].map((item) => (
             <div
               key={item.label}
-              className={`rounded-lg bg-[#131820] border border-white/10 ${
+              className={`rounded-xl bg-[#161422] border border-white/10 ${
                 compact ? 'p-2' : 'p-3'
               }`}
             >
               <div
-                className={`font-mono font-bold text-amber-400 tabular-nums ${
+                className={`font-mono font-bold text-violet-300 tabular-nums ${
                   compact ? 'text-base' : 'text-xl sm:text-2xl'
                 }`}
               >

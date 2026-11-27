@@ -35,6 +35,8 @@ import {
   GroupSettings,
   OrderRecord,
   OrderStatus,
+  PaymentSecurityCategory,
+  PaymentSecurityLog,
   RegisteredUser,
   RobuxPackage,
   VerifiedPaymentRecord,
@@ -49,6 +51,8 @@ interface AdminDashboardProps {
   orders: OrderRecord[];
   users: RegisteredUser[];
   verifiedPayments: VerifiedPaymentRecord[];
+  paymentSecurityLogs?: PaymentSecurityLog[];
+  adminToken?: string | null;
   groupSettings: GroupSettings;
   isCloudConnected: boolean;
   connectedCloudEmail: string | null;
@@ -77,10 +81,12 @@ type AdminTab = 'overview' | 'packages' | 'orders' | 'payments' | 'group';
 type ChartRange = '1D' | '1W' | '1M' | '6M' | '1Y';
 type RevenueWindow = 'All' | '6M' | '30D' | '7D';
 
+export const DEFAULT_PRODUCT_IMAGE = '/src/assets/images/pkg_starter_vault_1795779453204.jpg';
+
 const sanitizeImage = (url?: string): string => {
-  if (typeof url !== 'string') return '';
+  if (typeof url !== 'string') return DEFAULT_PRODUCT_IMAGE;
   const trimmed = url.trim();
-  if (!trimmed || trimmed.startsWith('/src/assets/images/pkg_')) return '';
+  if (!trimmed) return DEFAULT_PRODUCT_IMAGE;
   return trimmed;
 };
 
@@ -114,7 +120,7 @@ async function compressImageToDataUrl(file: File): Promise<string> {
   }
 }
 
-async function uploadProductPhoto(file: File): Promise<string> {
+async function uploadProductPhoto(file: File, adminToken?: string | null): Promise<string> {
   let dataUrl: string;
   try {
     dataUrl = await compressImageToDataUrl(file);
@@ -133,7 +139,9 @@ async function uploadProductPhoto(file: File): Promise<string> {
   try {
     const res = await fetch('/api/uploads', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminToken
+        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }
+        : { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dataUrl }),
     });
 
@@ -145,12 +153,15 @@ async function uploadProductPhoto(file: File): Promise<string> {
       }
     } else if (contentType.includes('application/json')) {
       const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-      if (res.status === 400 && errBody.error) {
+      if ((res.status === 400 || res.status === 401) && errBody.error) {
         throw new Error(errBody.error);
       }
     }
   } catch (err) {
-    if (err instanceof Error && err.message.includes('Image')) {
+    if (
+      err instanceof Error &&
+      (err.message.includes('Image') || err.message.includes('Admin'))
+    ) {
       throw err;
     }
   }
@@ -181,6 +192,8 @@ export function AdminDashboard({
   orders,
   users,
   verifiedPayments,
+  paymentSecurityLogs = [],
+  adminToken = null,
   groupSettings,
   isCloudConnected,
   connectedCloudEmail,
@@ -210,6 +223,8 @@ export function AdminDashboard({
   const [orderNotice, setOrderNotice] = useState<string | null>(null);
   const [pkgNotice, setPkgNotice] = useState<string | null>(null);
   const [pkgError, setPkgError] = useState<string | null>(null);
+  const [productCategory, setProductCategory] = useState('Robux');
+  const [productCustomTitle, setProductCustomTitle] = useState('');
   const [robuxAmount, setRobuxAmount] = useState('');
   const [priceBdt, setPriceBdt] = useState('');
   const [bonusTag, setBonusTag] = useState('Group Payout');
@@ -220,12 +235,14 @@ export function AdminDashboard({
 
   // Inline edit state for existing packages
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
+  const [editCategory, setEditCategory] = useState('Robux');
+  const [editTitle, setEditTitle] = useState('');
   const [editBdt, setEditBdt] = useState('');
   const [editTag, setEditTag] = useState('');
   const [editImage, setEditImage] = useState('');
   const [isUploadingEditPhoto, setIsUploadingEditPhoto] = useState(false);
 
-  // Payment Inbox (01764088123) state
+  // Payment Inbox (01764088123) & Security Audit Log state
   const [payMethod, setPayMethod] = useState<'Nagad' | 'Rocket' | 'bKash'>('Nagad');
   const [payTrxId, setPayTrxId] = useState('');
   const [payAmount, setPayAmount] = useState('');
@@ -233,6 +250,7 @@ export function AdminDashboard({
   const [payNotice, setPayNotice] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [securityLogFilter, setSecurityLogFilter] = useState<'all' | PaymentSecurityCategory>('all');
 
   const defaultRestockRemainingSec = groupSettings.restockTimestamp
     ? Math.max(0, Math.ceil((groupSettings.restockTimestamp - Date.now()) / 1000))
@@ -286,6 +304,28 @@ export function AdminDashboard({
       status: normalizeOrderStatus(ord.status),
     }));
   }, [orders]);
+
+  const securityStats = useMemo(() => {
+    const successful = paymentSecurityLogs.filter((l) => l.category === 'successful').length;
+    const failed = paymentSecurityLogs.filter((l) => l.category === 'failed').length;
+    const duplicate = paymentSecurityLogs.filter((l) => l.category === 'duplicate').length;
+    const suspicious = paymentSecurityLogs.filter((l) => l.category === 'suspicious').length;
+    const flaggedOrders = normalizedOrders.filter((o) => Boolean(o.paymentFlag)).length;
+    return {
+      total: paymentSecurityLogs.length,
+      successful,
+      failed,
+      duplicate,
+      suspicious,
+      flaggedOrders,
+      alertCount: suspicious + duplicate + flaggedOrders,
+    };
+  }, [paymentSecurityLogs, normalizedOrders]);
+
+  const filteredSecurityLogs = useMemo(() => {
+    if (securityLogFilter === 'all') return paymentSecurityLogs;
+    return paymentSecurityLogs.filter((l) => l.category === securityLogFilter);
+  }, [paymentSecurityLogs, securityLogFilter]);
 
   const filteredOrders = useMemo(() => {
     const q = orderSearch.trim().toLowerCase();
@@ -535,7 +575,7 @@ export function AdminDashboard({
     setPhotoUploadError(null);
     setIsUploadingPhoto(true);
     try {
-      const uploadedUrl = await uploadProductPhoto(file);
+      const uploadedUrl = await uploadProductPhoto(file, adminToken);
       setProductImage(uploadedUrl);
     } catch (err) {
       setPhotoUploadError(
@@ -557,7 +597,7 @@ export function AdminDashboard({
     setPkgError(null);
     setIsUploadingEditPhoto(true);
     try {
-      const uploadedUrl = await uploadProductPhoto(file);
+      const uploadedUrl = await uploadProductPhoto(file, adminToken);
       setEditImage(uploadedUrl);
     } catch (err) {
       setPkgError(
@@ -571,26 +611,31 @@ export function AdminDashboard({
   const handleAddSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isUploadingPhoto) return;
-    const robux = Number(robuxAmount);
+    const robux = Number(robuxAmount) || 0;
     const bdt = Number(priceBdt);
 
-    if (!robux || robux <= 0 || !bdt || bdt <= 0) {
-      setPkgError('Please enter valid positive numbers for Robux Amount and Price (BDT).');
+    if (!bdt || bdt <= 0) {
+      setPkgError('Please enter a valid Price (BDT).');
       return;
     }
 
     setPkgError(null);
+    const cat = productCategory.trim() || 'Robux';
+    const titleVal = productCustomTitle.trim() || (robux > 0 ? `${robux.toLocaleString()} Robux` : 'Roblox Item');
     const newPkg: RobuxPackage = {
-      id: `pkg-${robux}-${Date.now()}`,
-      robux,
-      title: `${robux.toLocaleString()} Robux`,
-      tierLabel: 'Custom Bundle',
+      id: `pkg-${Date.now()}`,
+      robux: robux > 0 ? robux : 400,
+      title: titleVal,
+      tierLabel: cat,
       priceBdt: bdt,
-      deliveryNote: bonusTag.trim() || 'Group Payout',
+      deliveryNote: bonusTag.trim() || 'Instant Delivery',
       image: sanitizeImage(productImage),
+      category: cat,
     };
 
     await onAddPackage(newPkg);
+    setProductCategory('Robux');
+    setProductCustomTitle('');
     setRobuxAmount('');
     setPriceBdt('');
     setBonusTag('Group Payout');
@@ -602,12 +647,14 @@ export function AdminDashboard({
     setPkgNotice(
       isCloudConnected
         ? `"${newPkg.title}" saved permanently to Cloud Database & Storefront.`
-        : `"${newPkg.title}" added to Storefront. Connect Cloud Database to keep it saved permanently across days & shared links.`
+        : `"${newPkg.title}" added to Storefront.`
     );
   };
 
   const startEditingPackage = (pkg: RobuxPackage) => {
     setEditingPkgId(pkg.id);
+    setEditCategory(pkg.category || 'Robux');
+    setEditTitle(pkg.title);
     setEditBdt(String(pkg.priceBdt));
     setEditTag(pkg.deliveryNote);
     setEditImage(sanitizeImage(pkg.image));
@@ -623,12 +670,14 @@ export function AdminDashboard({
     setPkgError(null);
     await onUpdatePackage({
       ...pkg,
+      title: editTitle.trim() || pkg.title,
+      category: editCategory.trim() || pkg.category || 'Robux',
       priceBdt: bdt,
       deliveryNote: editTag.trim() || pkg.deliveryNote,
       image: sanitizeImage(editImage),
     });
     setEditingPkgId(null);
-    setPkgNotice(`Updated "${pkg.title}" (৳${bdt} BDT).`);
+    setPkgNotice(`Updated "${editTitle || pkg.title}" (৳${bdt} BDT).`);
   };
 
   const handleGroupSubmit = async (e: FormEvent) => {
@@ -728,11 +777,11 @@ export function AdminDashboard({
   const currentLiveStock = groupSettings.availableRobux ?? 25400;
   const isZeroStock = currentLiveStock <= 0;
 
-  const navItems: { id: AdminTab; label: string; icon: typeof LayoutDashboard; count?: number }[] = [
+  const navItems: { id: AdminTab; label: string; icon: typeof LayoutDashboard; count?: number; alertCount?: number }[] = [
     { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'packages', label: 'Packages', icon: Package, count: packages.length },
-    { id: 'orders', label: 'Orders', icon: ShoppingBag, count: orders.length },
-    { id: 'payments', label: 'Payment Inbox', icon: Wallet, count: verifiedPayments.length },
+    { id: 'orders', label: 'Orders', icon: ShoppingBag, count: orders.length, alertCount: securityStats.flaggedOrders },
+    { id: 'payments', label: 'Payment Inbox', icon: Wallet, count: verifiedPayments.length, alertCount: securityStats.suspicious + securityStats.duplicate },
     { id: 'group', label: 'Stock & Group', icon: SlidersHorizontal },
   ];
 
@@ -831,15 +880,25 @@ export function AdminDashboard({
                         />
                         <span>{item.label}</span>
                       </span>
-                      {typeof item.count === 'number' && (
-                        <span
-                          className={`font-mono text-[11px] tabular-nums ${
-                            isActive ? 'text-[#E6C7DC]' : 'text-zinc-500'
-                          }`}
-                        >
-                          {item.count}
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-2">
+                        {typeof item.alertCount === 'number' && item.alertCount > 0 && (
+                          <span
+                            title={`${item.alertCount} security alert(s)`}
+                            className="inline-flex items-center rounded-full bg-red-500/20 border border-red-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-red-300 tabular-nums"
+                          >
+                            ! {item.alertCount}
+                          </span>
+                        )}
+                        {typeof item.count === 'number' && (
+                          <span
+                            className={`font-mono text-[11px] tabular-nums ${
+                              isActive ? 'text-[#E6C7DC]' : 'text-zinc-500'
+                            }`}
+                          >
+                            {item.count}
+                          </span>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
@@ -1514,21 +1573,53 @@ export function AdminDashboard({
                   >
                     <h3 className="font-display text-base font-semibold text-zinc-100 flex items-center gap-2">
                       <PackagePlus className="w-4 h-4 text-[#C9A7BF]" aria-hidden="true" />
-                      Add New Robux Package
+                      Add Roblox Item / Robux Package
                     </h3>
 
                     <div>
+                      <label htmlFor="adm-cat" className="block text-xs font-medium text-zinc-300 mb-1.5">
+                        Category / Game
+                      </label>
+                      <select
+                        id="adm-cat"
+                        value={productCategory}
+                        onChange={(e) => setProductCategory(e.target.value)}
+                        className="w-full min-h-[42px] rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#C9A7BF]"
+                      >
+                        <option value="Robux">Robux (Roblox Vault)</option>
+                        <option value="BloxFruits">BloxFruits</option>
+                        <option value="MM2">MM2 (Murder Mystery 2)</option>
+                        <option value="BloxFruit Physical Fruit">BloxFruit Physical Fruit</option>
+                        <option value="Rivals">Rivals</option>
+                        <option value="Gift Card's">Gift Card's</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="adm-title" className="block text-xs font-medium text-zinc-300 mb-1.5">
+                        Item Title (e.g. 2x Boss Drop or 800 Robux)
+                      </label>
+                      <input
+                        id="adm-title"
+                        type="text"
+                        value={productCustomTitle}
+                        onChange={(e) => setProductCustomTitle(e.target.value)}
+                        placeholder="e.g. 2x Boss Drop or 10$ Gift Card"
+                        className="w-full min-h-[42px] rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#C9A7BF]"
+                      />
+                    </div>
+
+                    <div>
                       <label htmlFor="adm-robux" className="block text-xs font-medium text-zinc-300 mb-1.5">
-                        Robux Amount
+                        Robux Amount (or Value)
                       </label>
                       <input
                         id="adm-robux"
                         type="number"
-                        min={1}
-                        required
+                        min={0}
                         value={robuxAmount}
                         onChange={(e) => setRobuxAmount(e.target.value)}
-                        placeholder="e.g. 4500"
+                        placeholder="e.g. 400"
                         className="w-full min-h-[42px] rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#C9A7BF]"
                       />
                     </div>
@@ -1544,21 +1635,21 @@ export function AdminDashboard({
                         required
                         value={priceBdt}
                         onChange={(e) => setPriceBdt(e.target.value)}
-                        placeholder="e.g. 5900"
+                        placeholder="e.g. 380"
                         className="w-full min-h-[42px] rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#C9A7BF]"
                       />
                     </div>
 
                     <div>
                       <label htmlFor="adm-tag" className="block text-xs font-medium text-zinc-300 mb-1.5">
-                        Bonus / Tag
+                        Bonus / Delivery Note
                       </label>
                       <input
                         id="adm-tag"
                         type="text"
                         value={bonusTag}
                         onChange={(e) => setBonusTag(e.target.value)}
-                        placeholder="Best Value / +200 Bonus"
+                        placeholder="Instant Code / Group Payout"
                         className="w-full min-h-[42px] rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#C9A7BF]"
                       />
                     </div>
@@ -1587,7 +1678,7 @@ export function AdminDashboard({
                             />
                           </label>
 
-                          {sanitizeImage(productImage) && (
+                          {productImage && (
                             <button
                               type="button"
                               onClick={() => {
@@ -1597,7 +1688,7 @@ export function AdminDashboard({
                               className="inline-flex min-h-[38px] items-center gap-1 rounded-lg bg-red-500/10 border border-red-500/30 px-2.5 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/20 transition-colors"
                             >
                               <X className="w-3.5 h-3.5" aria-hidden="true" />
-                              Remove
+                              Remove Photo
                             </button>
                           )}
                         </div>
@@ -1615,7 +1706,7 @@ export function AdminDashboard({
                           <p className="text-xs text-red-400">{photoUploadError}</p>
                         )}
 
-                        {sanitizeImage(productImage) && (
+                        {productImage ? (
                           <div className="flex items-center gap-3 pt-1">
                             <img
                               src={sanitizeImage(productImage)}
@@ -1623,7 +1714,18 @@ export function AdminDashboard({
                               className="h-14 w-14 rounded-lg object-cover border border-white/10 bg-[#141019]"
                             />
                             <span className="text-[11px] text-emerald-300 font-medium">
-                              Product photo ready
+                              Custom photo ready
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 pt-1">
+                            <img
+                              src={DEFAULT_PRODUCT_IMAGE}
+                              alt="Default photo"
+                              className="h-14 w-14 rounded-lg object-cover border border-white/10 bg-[#141019] opacity-80"
+                            />
+                            <span className="text-[11px] text-zinc-400">
+                              Default photo (200 Robux image) active
                             </span>
                           </div>
                         )}
@@ -1757,7 +1859,7 @@ export function AdminDashboard({
                                       placeholder="Product image URL (optional)"
                                       className="flex-1 min-w-[180px] min-h-[34px] rounded-lg bg-[#09070B] border border-white/15 px-2.5 py-1 text-xs text-zinc-200 placeholder:text-zinc-500"
                                     />
-                                    {sanitizeImage(editImage) && (
+                                    {editImage ? (
                                       <>
                                         <img
                                           src={sanitizeImage(editImage)}
@@ -1773,6 +1875,15 @@ export function AdminDashboard({
                                           Remove Photo
                                         </button>
                                       </>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <img
+                                          src={DEFAULT_PRODUCT_IMAGE}
+                                          alt="Default"
+                                          className="h-8 w-8 rounded object-cover border border-white/15 opacity-80"
+                                        />
+                                        <span className="text-[11px] text-zinc-400">Default photo active</span>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -1894,19 +2005,32 @@ export function AdminDashboard({
                                 </div>
                                 <div className="text-zinc-400 mt-0.5">{order.paymentMethod}</div>
                                 {order.transactionId && (
-                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                    <span className="font-mono text-[11px] text-zinc-200 bg-white/[0.06] px-2 py-0.5 rounded">
-                                      TrxID: {order.transactionId}
-                                    </span>
-                                    <span
-                                      className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                                        order.paymentVerified
-                                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                                          : 'bg-amber-400/15 text-amber-300 border border-amber-400/30'
-                                      }`}
-                                    >
-                                      {order.paymentVerified ? 'Verified 01764088123' : 'Check 01764088123 App'}
-                                    </span>
+                                  <div className="mt-1 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-mono text-[11px] text-zinc-200 bg-white/[0.06] px-2 py-0.5 rounded">
+                                        TrxID: {order.transactionId}
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                                          order.paymentVerified
+                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                            : 'bg-amber-400/15 text-amber-300 border border-amber-400/30'
+                                        }`}
+                                      >
+                                        {order.paymentVerified ? 'Verified 01764088123' : 'Check 01764088123 App'}
+                                      </span>
+                                    </div>
+                                    {order.senderPhone && (
+                                      <div className="font-mono text-[11px] text-zinc-400">
+                                        Sender: {order.senderPhone}
+                                      </div>
+                                    )}
+                                    {order.paymentFlag && (
+                                      <div className="inline-flex items-start gap-1.5 rounded-lg bg-red-500/15 border border-red-500/35 px-2.5 py-1 text-[11px] font-medium text-red-300">
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                                        <span>{order.paymentFlagReason || order.paymentFlag}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -2162,6 +2286,11 @@ export function AdminDashboard({
                                       <div className="font-mono text-[11px] text-zinc-200">
                                         TrxID: {order.transactionId}
                                       </div>
+                                      {order.senderPhone && (
+                                        <div className="font-mono text-[11px] text-zinc-400">
+                                          Sender: {order.senderPhone}
+                                        </div>
+                                      )}
                                       <span
                                         className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded ${
                                           order.paymentVerified
@@ -2178,6 +2307,12 @@ export function AdminDashboard({
                                           'Check 01764088123 App'
                                         )}
                                       </span>
+                                      {order.paymentFlag && (
+                                        <div className="inline-flex items-start gap-1 rounded-md bg-red-500/15 border border-red-500/35 px-2 py-1 text-[10px] font-medium text-red-300 max-w-[230px]">
+                                          <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" aria-hidden="true" />
+                                          <span>{order.paymentFlagReason || order.paymentFlag}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </td>
@@ -2265,18 +2400,44 @@ export function AdminDashboard({
               </div>
             )}
 
-            {/* TAB: PAYMENT INBOX (01764088123 Nagad & Rocket Verification) */}
+            {/* TAB: PAYMENT INBOX & SECURITY LOGS (01764088123 Nagad & Rocket Verification) */}
             {activeTab === 'payments' && (
               <div className="space-y-6">
+                {securityStats.alertCount > 0 && (
+                  <div
+                    role="alert"
+                    className="rounded-2xl bg-red-500/[0.08] border border-red-500/35 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                      <div className="space-y-1 text-xs">
+                        <div className="font-semibold text-red-200">
+                          Payment Security Alert: {securityStats.suspicious} suspicious, {securityStats.duplicate} duplicate attempt(s), and {securityStats.flaggedOrders} flagged order(s)
+                        </div>
+                        <p className="text-red-300/80">
+                          Review duplicate TrxID blocks, amount/sender mismatches, and invalid webhook requests in the Payment Security Audit Log below before approving payouts.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSecurityLogFilter('suspicious')}
+                      className="inline-flex min-h-[34px] items-center justify-center rounded-full bg-red-500/20 border border-red-500/40 px-3.5 py-1 text-xs font-semibold text-red-200 hover:bg-red-500/30 whitespace-nowrap shrink-0"
+                    >
+                      View Suspicious Logs
+                    </button>
+                  </div>
+                )}
+
                 <div className="rounded-2xl bg-[#110E15] border border-[#C9A7BF]/25 p-5 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h3 className="font-display text-base font-semibold text-zinc-100 flex items-center gap-2">
                         <Smartphone className="w-4 h-4 text-[#C9A7BF]" aria-hidden="true" />
-                        Auto-Check Nagad &amp; Rocket Payments on 01764088123
+                        HMAC-Authenticated SMS Webhook &amp; Verification (01764088123)
                       </h3>
                       <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-                        Personal Nagad and Rocket apps on your phone do not have a public read API. To auto-verify real payments the second money arrives on <span className="font-mono text-zinc-200">01764088123</span>, install an Android SMS Forwarder app (e.g. SMS Forwarder / MacroDroid) on your phone and point Nagad &amp; Rocket SMS notifications to this webhook URL, or log incoming SMS TrxIDs below.
+                        Personal Nagad and Rocket wallets (<span className="font-mono text-zinc-200">01764088123</span>) do not provide a public merchant read API. Requests to the webhook require server-side <span className="font-mono text-zinc-200">PAYMENT_WEBHOOK_SECRET</span> HMAC-SHA256 authentication plus timestamp &amp; nonce anti-replay checks; otherwise log confirmed incoming SMS receipts below.
                       </p>
                     </div>
                     <button
@@ -2292,8 +2453,11 @@ export function AdminDashboard({
                       {copiedWebhook ? 'Copied Webhook!' : 'Copy SMS Webhook URL'}
                     </button>
                   </div>
-                  <div className="rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2 font-mono text-xs text-[#E6C7DC] break-all">
-                    POST {webhookUrl} — JSON body: {`{"sender":"Nagad","message":"You have received Tk 1180.00 ... TrxID 72A94K81M2"}`}
+                  <div className="rounded-xl bg-[#09070B] border border-white/10 px-3.5 py-2.5 font-mono text-[11px] text-[#E6C7DC] space-y-1 break-all">
+                    <div>POST {webhookUrl}</div>
+                    <div className="text-zinc-400">
+                      Headers: X-Webhook-Timestamp (epoch ms), X-Webhook-Nonce (unique id), X-Webhook-Signature: sha256=HMAC_SHA256(PAYMENT_WEBHOOK_SECRET, &quot;timestamp.nonce.rawBody&quot;)
+                    </div>
                   </div>
                 </div>
 
@@ -2449,6 +2613,128 @@ export function AdminDashboard({
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Payment Security Logs & Fraud Audit Trail */}
+                <div className="rounded-2xl bg-[#110E15] border border-white/[0.09] p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-display text-base font-semibold text-zinc-100 flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-[#C9A7BF]" aria-hidden="true" />
+                        Payment Security Logs &amp; Audit Trail
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Every payment attempt, duplicate TrxID block, HMAC webhook check, and amount mismatch is logged automatically.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 rounded-full bg-[#09070B] border border-white/[0.08] p-1 self-start sm:self-auto">
+                      {(
+                        [
+                          { id: 'all', label: `All (${securityStats.total})` },
+                          { id: 'successful', label: `Successful (${securityStats.successful})` },
+                          { id: 'failed', label: `Failed (${securityStats.failed})` },
+                          { id: 'duplicate', label: `Duplicate (${securityStats.duplicate})` },
+                          { id: 'suspicious', label: `Suspicious (${securityStats.suspicious})` },
+                        ] as const
+                      ).map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setSecurityLogFilter(cat.id)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+                            securityLogFilter === cat.id
+                              ? cat.id === 'suspicious' || cat.id === 'duplicate'
+                                ? 'bg-red-500/25 text-red-200 border border-red-500/45'
+                                : 'bg-[#2C212C] text-white border border-[#C9A7BF]/35'
+                              : 'text-zinc-400 hover:text-white border border-transparent'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {filteredSecurityLogs.length === 0 ? (
+                    <div className="rounded-xl bg-[#17131D] border border-white/[0.07] p-5 text-xs text-zinc-400">
+                      No security events recorded under this filter yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                      {filteredSecurityLogs.map((log) => {
+                        const badgeStyle =
+                          log.category === 'successful'
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : log.category === 'duplicate'
+                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/35'
+                            : log.category === 'suspicious'
+                            ? 'bg-red-500/15 text-red-300 border-red-500/35'
+                            : 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30';
+                        const displayAmount =
+                          typeof log.submittedAmountBdt === 'number'
+                            ? log.submittedAmountBdt
+                            : typeof log.matchedAmountBdt === 'number'
+                            ? log.matchedAmountBdt
+                            : null;
+                        return (
+                          <div
+                            key={log.id}
+                            className={`rounded-xl bg-[#17131D] border px-4 py-3 text-xs space-y-1.5 ${
+                              log.category === 'suspicious' || log.category === 'duplicate'
+                                ? 'border-red-500/30'
+                                : 'border-white/[0.08]'
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${badgeStyle}`}>
+                                  {log.category}
+                                </span>
+                                <span className="font-mono text-[11px] text-zinc-200">
+                                  {log.eventType}
+                                </span>
+                                {log.trxId && (
+                                  <span className="font-mono text-[11px] bg-white/[0.06] px-2 py-0.5 rounded text-[#E6C7DC]">
+                                    TrxID: {log.trxId}
+                                  </span>
+                                )}
+                                {displayAmount !== null && (
+                                  <span className="font-mono text-[11px] text-emerald-300 font-semibold">
+                                    ৳{displayAmount} BDT
+                                  </span>
+                                )}
+                                {log.orderNumber && (
+                                  <span className="font-mono text-[11px] text-zinc-400">
+                                    {log.orderNumber}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-zinc-500 font-mono">
+                                {new Date(log.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+
+                            <p className="text-zinc-300 leading-relaxed">{log.reason}</p>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+                              <span>Method: {log.paymentMethod || 'N/A'}</span>
+                              <span>Source: {log.source}</span>
+                              {log.senderPhone && <span className="font-mono">Sender: {log.senderPhone}</span>}
+                              {log.userEmail && <span>User: {log.userEmail}</span>}
+                              {typeof log.matchedAmountBdt === 'number' &&
+                                typeof log.submittedAmountBdt === 'number' &&
+                                log.matchedAmountBdt !== log.submittedAmountBdt && (
+                                  <span className="text-amber-300 font-mono">
+                                    Submitted ৳{log.submittedAmountBdt} vs Received ৳{log.matchedAmountBdt}
+                                  </span>
+                                )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

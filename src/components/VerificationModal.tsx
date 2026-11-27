@@ -49,6 +49,8 @@ interface VerificationModalProps {
     method: string;
     transactionId?: string;
     verified?: boolean;
+    flagged?: boolean;
+    flagMessage?: string;
   } | null;
   onClose: () => void;
   onRequireSignIn: () => void;
@@ -60,7 +62,7 @@ interface VerificationModalProps {
   onClearPaymentError?: () => void;
   onSelectPayment: (id: string) => void;
   onShowOutOfStock?: () => void;
-  onSubmitOrder: (transactionId: string) => void | Promise<void>;
+  onSubmitOrder: (transactionId: string, senderPhone?: string) => void | Promise<void>;
 }
 
 export function VerificationModal({
@@ -95,6 +97,7 @@ export function VerificationModal({
   onSubmitOrder,
 }: VerificationModalProps) {
   const [transactionIdInput, setTransactionIdInput] = useState('');
+  const [senderPhoneInput, setSenderPhoneInput] = useState('');
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [trxError, setTrxError] = useState<string | null>(null);
   const [showBkashPopup, setShowBkashPopup] = useState(false);
@@ -102,6 +105,7 @@ export function VerificationModal({
   useEffect(() => {
     if (orderReceipt) {
       setTransactionIdInput('');
+      setSenderPhoneInput('');
       setTrxError(null);
     }
   }, [orderReceipt]);
@@ -148,13 +152,13 @@ export function VerificationModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-xl bg-[#131820] border border-white/10 shadow-2xl"
+            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-[#110F1B] border border-white/10 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-[#131820] flex items-center justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
+            <div className="sticky top-0 z-10 bg-[#110F1B] flex items-center justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#764AF1]/15 text-violet-300 border border-[#764AF1]/30">
                   <RobuxMark className="w-5 h-5" />
                 </div>
                 <div>
@@ -173,7 +177,7 @@ export function VerificationModal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close checkout modal"
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -205,7 +209,7 @@ export function VerificationModal({
                     <button
                       type="button"
                       onClick={onSwitchRobloxUsername}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#090B0E] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:border-amber-400/60 hover:text-amber-300 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#0A090F] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:border-[#764AF1]/60 hover:text-violet-200 transition-colors"
                     >
                       <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
                       Use New Username
@@ -214,7 +218,7 @@ export function VerificationModal({
                 </div>
               ) : (
                 <>
-                  <div className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-4">
+                  <div className="rounded-xl bg-[#161422] border border-white/[0.08] p-4">
                     <p className="text-sm font-medium text-zinc-100 leading-relaxed">
                       You must join our official Roblox community group before purchasing.
                     </p>
@@ -251,14 +255,14 @@ export function VerificationModal({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={onGroupLinkClick}
-                      className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                      className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#764AF1] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1]"
                     >
                       <span>Join Community</span>
                       <ExternalLink className="w-4 h-4 shrink-0" aria-hidden="true" />
                     </a>
 
                     {isSignedIn && !isGroupVerified && savedVerifiedTimers.length > 0 && (
-                      <div className="rounded-lg bg-[#090B0E] border border-white/10 p-3 space-y-2">
+                      <div className="rounded-xl bg-[#0A090F] border border-white/10 p-3 space-y-2">
                         <div className="text-[11px] font-medium text-zinc-400">
                           Previously Verified Roblox Accounts (no new timer for completed accounts):
                         </div>
@@ -272,10 +276,10 @@ export function VerificationModal({
                                 key={saved.robloxUsername.toLowerCase()}
                                 type="button"
                                 onClick={() => onSelectSavedUsername(saved)}
-                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                                   isReady
                                     ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300 hover:bg-emerald-500/20'
-                                    : 'bg-amber-400/10 border-amber-400/35 text-amber-300 hover:bg-amber-400/20'
+                                    : 'bg-[#764AF1]/15 border-[#764AF1]/35 text-violet-200 hover:bg-[#764AF1]/25'
                                 }`}
                               >
                                 <span className="font-mono">{saved.robloxUsername}</span>
@@ -294,7 +298,7 @@ export function VerificationModal({
                         htmlFor="modal-roblox-username"
                         className="block text-xs font-medium text-zinc-300 mb-2"
                       >
-                        Enter your Roblox Username <span className="text-amber-400">*</span>
+                        Enter your Roblox Username <span className="text-violet-300">*</span>
                       </label>
                       <input
                         id="modal-roblox-username"
@@ -304,7 +308,7 @@ export function VerificationModal({
                         value={robloxUsername}
                         onChange={(e) => onUsernameChange(e.target.value)}
                         placeholder="Enter exact Roblox username"
-                        className="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 disabled:opacity-60 transition-colors"
+                        className="w-full min-h-[44px] rounded-lg bg-[#0A090F] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1] focus:ring-1 focus:ring-[#764AF1] disabled:opacity-60 transition-colors"
                       />
                     </div>
 
@@ -328,7 +332,7 @@ export function VerificationModal({
                             onClose();
                             onRequireSignIn();
                           }}
-                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#764AF1] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors"
                         >
                           <Lock className="w-4 h-4" aria-hidden="true" />
                           <span>Sign In to Verify &amp; Buy</span>
@@ -338,7 +342,7 @@ export function VerificationModal({
                           type="button"
                           disabled={isVerifyingApi}
                           onClick={onVerifyMembership}
-                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:opacity-60 transition-colors"
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-60 transition-colors"
                         >
                           {isVerifyingApi ? (
                             <>
@@ -351,14 +355,14 @@ export function VerificationModal({
                         </button>
                       ) : (
                         <>
-                          <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-300">
                             <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                             Verified Member
                           </span>
                           <button
                             type="button"
                             onClick={onSwitchRobloxUsername}
-                            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[#090B0E] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-amber-400/60 hover:text-amber-300 transition-colors"
+                            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-[#0A090F] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-[#764AF1]/60 hover:text-violet-200 transition-colors"
                           >
                             <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
                             Use New Username
@@ -369,7 +373,7 @@ export function VerificationModal({
                   </div>
 
                   {/* Step 2: 15-Day Live Countdown Timer */}
-                  <div className="rounded-xl bg-[#0D1117] border border-white/[0.08] p-5 space-y-4">
+                  <div className="rounded-xl bg-[#161422] border border-white/[0.08] p-5 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h3 className="font-display text-sm font-semibold text-zinc-100">
@@ -388,7 +392,7 @@ export function VerificationModal({
                           isPaymentUnlocked
                             ? 'text-emerald-400'
                             : isGroupVerified
-                            ? 'text-amber-400'
+                            ? 'text-violet-300'
                             : 'text-zinc-600'
                         }`}
                         aria-hidden="true"
@@ -404,14 +408,14 @@ export function VerificationModal({
                       ].map((unit) => (
                         <div
                           key={unit.label}
-                          className="rounded-lg bg-[#131820] border border-white/[0.08] py-3 px-2"
+                          className="rounded-xl bg-[#110F1B] border border-white/[0.08] py-3 px-2"
                         >
                           <div
                             className={`font-mono text-xl sm:text-2xl font-semibold tabular-nums ${
                               isPaymentUnlocked
                                 ? 'text-emerald-400'
                                 : isGroupVerified
-                                ? 'text-amber-300'
+                                ? 'text-violet-300'
                                 : 'text-zinc-500'
                             }`}
                           >
@@ -426,7 +430,7 @@ export function VerificationModal({
                       <button
                         type="button"
                         onClick={onAdminUnlockTimer}
-                        className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400/15 border border-amber-400/40 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/25 transition-colors"
+                        className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 rounded-full bg-[#764AF1]/20 border border-[#764AF1]/40 px-4 py-2 text-xs font-semibold text-violet-200 hover:bg-[#764AF1]/30 transition-colors"
                       >
                         <Zap className="w-3.5 h-3.5" aria-hidden="true" />
                         Admin: Complete Timer &amp; Unlock Payment
@@ -438,7 +442,7 @@ export function VerificationModal({
 
               {/* Step 3: Payment Section inside Checkout Modal */}
               <div
-                className={`rounded-xl bg-[#0D1117] border p-5 space-y-4 transition-all duration-500 ${
+                className={`rounded-xl bg-[#161422] border p-5 space-y-4 transition-all duration-500 ${
                   isOutOfStock
                     ? 'border-red-500/50 bg-red-500/[0.04] stock-alert-red'
                     : 'border-white/[0.08]'
@@ -474,7 +478,7 @@ export function VerificationModal({
                         </>
                       ) : (
                         <>
-                          <Lock className="w-3.5 h-3.5 shrink-0 text-amber-400" aria-hidden="true" />
+                          <Lock className="w-3.5 h-3.5 shrink-0 text-violet-300" aria-hidden="true" />
                           <span>{PAYMENT_LOCKED_MESSAGE}</span>
                         </>
                       )}
@@ -522,16 +526,16 @@ export function VerificationModal({
                           }
                           onSelectPayment(option.id);
                         }}
-                        className={`flex flex-col justify-between text-left rounded-lg p-3.5 border transition-colors ${
+                        className={`flex flex-col justify-between text-left rounded-xl p-3.5 border transition-colors ${
                           isComingSoon
-                            ? 'bg-[#131820] border-white/15 text-zinc-200 hover:border-amber-400/60 cursor-pointer'
+                            ? 'bg-[#110F1B] border-white/15 text-zinc-200 hover:border-[#764AF1]/60 cursor-pointer'
                             : isDisabled
-                            ? 'bg-[#131820]/50 border-white/[0.06] text-zinc-500 cursor-not-allowed opacity-75'
+                            ? 'bg-[#110F1B]/50 border-white/[0.06] text-zinc-500 cursor-not-allowed opacity-75'
                             : isOutOfStock
-                            ? 'bg-[#131820] border-red-500/40 text-zinc-200 hover:border-red-400 cursor-pointer'
+                            ? 'bg-[#110F1B] border-red-500/40 text-zinc-200 hover:border-red-400 cursor-pointer'
                             : isSelected
-                            ? 'bg-[#131820] border-amber-400 text-zinc-100'
-                            : 'bg-[#131820] border-white/10 text-zinc-200 hover:border-white/25 cursor-pointer'
+                            ? 'bg-[#110F1B] border-[#764AF1] text-zinc-100'
+                            : 'bg-[#110F1B] border-white/10 text-zinc-200 hover:border-white/25 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 w-full">
@@ -539,11 +543,11 @@ export function VerificationModal({
                             <CreditCard
                               className={`w-4 h-4 shrink-0 ${
                                 isComingSoon
-                                  ? 'text-amber-400'
+                                  ? 'text-violet-300'
                                   : isOutOfStock && isPaymentUnlocked
                                   ? 'text-red-400'
                                   : isPaymentUnlocked
-                                  ? 'text-amber-400'
+                                  ? 'text-violet-300'
                                   : 'text-zinc-600'
                               }`}
                               aria-hidden="true"
@@ -553,7 +557,7 @@ export function VerificationModal({
                             </span>
                           </div>
                           {isComingSoon && (
-                            <span className="rounded bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300">
+                            <span className="rounded-full bg-[#764AF1]/15 border border-[#764AF1]/30 px-2 py-0.5 text-[9px] font-semibold text-violet-200">
                               Soon
                             </span>
                           )}
@@ -563,7 +567,7 @@ export function VerificationModal({
                         </p>
                         <div className="mt-3 pt-2 border-t border-white/[0.06] flex items-center justify-between gap-2 text-[11px]">
                           {isComingSoon ? (
-                            <span className="inline-flex items-center gap-1 text-amber-300 font-medium">
+                            <span className="inline-flex items-center gap-1 text-violet-300 font-medium">
                               <Sparkles className="w-3 h-3 shrink-0" aria-hidden="true" />
                               Coming Soon
                             </span>
@@ -578,7 +582,7 @@ export function VerificationModal({
                               Out of Stock
                             </span>
                           ) : (
-                            <span className={isSelected ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
+                            <span className={isSelected ? 'text-violet-300 font-semibold' : 'text-emerald-400'}>
                               {isSelected ? 'Selected' : 'Available'}
                             </span>
                           )}
@@ -594,26 +598,26 @@ export function VerificationModal({
                 {isPaymentUnlocked && !orderReceipt && (
                   <div className="space-y-3 pt-2 border-t border-white/[0.08]">
                     <div
-                      className={`rounded-lg bg-[#090B0E] border p-3.5 space-y-2.5 transition-colors duration-500 ${
-                        isOutOfStock ? 'border-red-500/45' : 'border-amber-400/30'
+                      className={`rounded-xl bg-[#0A090F] border p-3.5 space-y-2.5 transition-colors duration-500 ${
+                        isOutOfStock ? 'border-red-500/45' : 'border-[#764AF1]/35'
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div>
-                          <span className="text-[11px] text-amber-400 font-semibold">
+                          <span className="text-[11px] text-violet-300 font-semibold">
                             Official Send Money Number ({selectedPaymentId ? selectedPaymentId.toUpperCase() : 'Nagad / Rocket'})
                           </span>
                           <div className="font-mono text-lg font-bold text-zinc-100">
                             01764088123
                           </div>
                           <p className="text-[11px] text-zinc-400 mt-0.5">
-                            Send <span className="text-amber-300 font-semibold">৳{selectedPackage.priceBdt} BDT</span> to this number, then paste your TrxID below.
+                            Send <span className="text-violet-300 font-semibold">৳{selectedPackage.priceBdt} BDT</span> to this number, then paste your TrxID below.
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={handleCopyPhone}
-                          className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0"
+                          className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-full bg-[#764AF1] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap shrink-0"
                         >
                           <Copy className="w-3.5 h-3.5" aria-hidden="true" />
                           {copiedPhone ? 'Copied!' : 'Copy Number'}
@@ -622,7 +626,7 @@ export function VerificationModal({
 
                       <div>
                         <label htmlFor="modal-trx-id-input" className="block text-xs font-medium text-zinc-300 mb-1">
-                          Enter Transaction ID (TrxID) <span className="text-amber-400">*</span>
+                          Enter Transaction ID (TrxID) <span className="text-violet-300">*</span>
                         </label>
                         <input
                           id="modal-trx-id-input"
@@ -635,7 +639,25 @@ export function VerificationModal({
                             onClearPaymentError?.();
                           }}
                           placeholder="e.g. 72A94K81M2 (from Nagad/Rocket SMS)"
-                          className="w-full min-h-[40px] rounded-lg bg-[#131820] border border-white/15 px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400"
+                          className="w-full min-h-[40px] rounded-lg bg-[#110F1B] border border-white/15 px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1]"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="modal-sender-phone-input" className="block text-xs font-medium text-zinc-300 mb-1">
+                          Sender Mobile Number <span className="text-zinc-500">(Optional · 01XXXXXXXXX)</span>
+                        </label>
+                        <input
+                          id="modal-sender-phone-input"
+                          type="tel"
+                          value={senderPhoneInput}
+                          onChange={(e) => {
+                            setSenderPhoneInput(e.target.value);
+                            setTrxError(null);
+                            onClearPaymentError?.();
+                          }}
+                          placeholder="01XXXXXXXXX (number you sent money from)"
+                          className="w-full min-h-[40px] rounded-lg bg-[#110F1B] border border-white/15 px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1]"
                         />
                       </div>
                     </div>
@@ -667,16 +689,21 @@ export function VerificationModal({
                             setTrxError('Please enter a valid Nagad/Rocket Transaction ID (at least 8 characters with numbers).');
                             return;
                           }
+                          const cleanSender = senderPhoneInput.replace(/[\s\-]/g, '').trim();
+                          if (cleanSender && !/^(\+?88)?01[3-9]\d{8}$/.test(cleanSender)) {
+                            setTrxError('Invalid Sender Number. Use an 11-digit BD number (e.g. 01XXXXXXXXX).');
+                            return;
+                          }
                           setTrxError(null);
                           onClearPaymentError?.();
-                          void onSubmitOrder(cleanTrx);
+                          void onSubmitOrder(cleanTrx, cleanSender || undefined);
                         }}
-                        className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
+                        className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
                           isOutOfStock
                             ? 'bg-red-500/20 border border-red-500/50 text-red-300 hover:bg-red-500/30'
                             : selectedPaymentId && transactionIdInput.trim() && !isVerifyingApi && !isSubmittingOrder
-                            ? 'bg-amber-400 text-zinc-950 hover:bg-amber-300'
-                            : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                            ? 'bg-[#764AF1] text-white hover:bg-[#855DF7]'
+                            : 'bg-[#1C1928] text-zinc-500 cursor-not-allowed'
                         }`}
                       >
                         {isOutOfStock ? (
@@ -707,22 +734,34 @@ export function VerificationModal({
                 {orderReceipt && (
                   <div
                     role="status"
-                    className={`rounded-lg border p-4 space-y-1.5 ${
-                      orderReceipt.verified
+                    className={`rounded-xl border p-4 space-y-1.5 ${
+                      orderReceipt.flagged
+                        ? 'bg-amber-500/10 border-amber-500/35'
+                        : orderReceipt.verified
                         ? 'bg-emerald-500/10 border-emerald-500/30'
-                        : 'bg-amber-400/10 border-amber-400/30'
+                        : 'bg-[#764AF1]/10 border-[#764AF1]/30'
                     }`}
                   >
                     <div
                       className={`flex items-center gap-2 text-sm font-semibold ${
-                        orderReceipt.verified ? 'text-emerald-300' : 'text-amber-300'
+                        orderReceipt.flagged
+                          ? 'text-amber-300'
+                          : orderReceipt.verified
+                          ? 'text-emerald-300'
+                          : 'text-violet-200'
                       }`}
                     >
-                      <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      {orderReceipt.flagged ? (
+                        <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      )}
                       <span>
-                        {orderReceipt.verified
+                        {orderReceipt.flagged
+                          ? `Order #${orderReceipt.orderId} Pending Review (Flagged)`
+                          : orderReceipt.verified
                           ? `Payment Verified & Order #${orderReceipt.orderId} Approved!`
-                          : `Order #${orderReceipt.orderId} Submitted (Pending 01764088123 Check)`}
+                          : `Order #${orderReceipt.orderId} Submitted (Pending Verification)`}
                       </span>
                     </div>
                     {orderReceipt.transactionId && (
@@ -731,9 +770,11 @@ export function VerificationModal({
                       </p>
                     )}
                     <p className="text-xs text-zinc-200 leading-relaxed">
-                      {orderReceipt.verified
+                      {orderReceipt.flagged
+                        ? orderReceipt.flagMessage || 'Payment amount or sender details differed from the invoice and was flagged for Admin verification.'
+                        : orderReceipt.verified
                         ? 'Your payment to 01764088123 has been verified! Please wait for 15 hours. After that time your Robux will be successfully transferred to your account.'
-                        : 'Order submitted! Once your payment to 01764088123 is confirmed in our Nagad/Rocket inbox, your Robux transfer begins. Please wait for 15 hours for your Robux to arrive.'}
+                        : 'Order submitted as Pending! Payment cannot be approved until our server receives SMS confirmation or Admin verifies it on 01764088123.'}
                     </p>
                   </div>
                 )}
@@ -754,11 +795,11 @@ export function VerificationModal({
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-sm rounded-xl bg-[#131820] border border-amber-400/40 p-6 shadow-2xl space-y-4"
+                className="w-full max-w-sm rounded-2xl bg-[#110F1B] border border-[#764AF1]/40 p-6 shadow-2xl space-y-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-400/15 text-amber-400 border border-amber-400/30">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#764AF1]/15 text-violet-300 border border-[#764AF1]/30">
                       <Sparkles className="w-5 h-5" aria-hidden="true" />
                     </div>
                     <div>
@@ -768,7 +809,7 @@ export function VerificationModal({
                       >
                         bKash is Coming Soon
                       </h4>
-                      <p className="text-xs text-amber-300 font-medium">
+                      <p className="text-xs text-violet-300 font-medium">
                         Payment Method Notice
                       </p>
                     </div>
@@ -777,20 +818,20 @@ export function VerificationModal({
                     type="button"
                     aria-label="Close message"
                     onClick={() => setShowBkashPopup(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 <p className="text-sm text-zinc-300 leading-relaxed">
-                  bKash payment is coming soon! Please select <span className="font-semibold text-amber-300">Nagad</span> or <span className="font-semibold text-amber-300">Rocket</span> (<span className="font-mono text-zinc-100">01764088123</span>) to complete your order right now.
+                  bKash payment is coming soon! Please select <span className="font-semibold text-violet-300">Nagad</span> or <span className="font-semibold text-violet-300">Rocket</span> (<span className="font-mono text-zinc-100">01764088123</span>) to complete your order right now.
                 </p>
 
                 <button
                   type="button"
                   onClick={() => setShowBkashPopup(false)}
-                  className="w-full min-h-[42px] rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+                  className="w-full min-h-[42px] rounded-full bg-[#764AF1] px-4 py-2 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors"
                 >
                   Okay, Got It
                 </button>

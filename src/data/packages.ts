@@ -6,6 +6,8 @@ export interface RobuxPackage {
   priceBdt: number;
   deliveryNote: string;
   image: string;
+  category?: string;
+  originalPriceBdt?: number;
 }
 
 export interface PaymentOption {
@@ -64,7 +66,10 @@ export interface OrderRecord {
   priceBdt: number;
   paymentMethod: string;
   transactionId?: string;
+  senderPhone?: string;
   paymentVerified?: boolean;
+  paymentFlag?: string;
+  paymentFlagReason?: string;
   status: OrderStatus;
   verifiedAtMs?: number;
   unlockAtMs?: number;
@@ -82,6 +87,27 @@ export interface VerifiedPaymentRecord {
   source: 'sms_webhook' | 'admin_manual';
   usedByOrderId?: string;
   receivedAt: string;
+}
+
+export type PaymentSecurityCategory = 'successful' | 'failed' | 'duplicate' | 'suspicious';
+
+export interface PaymentSecurityLog {
+  id: string;
+  category: PaymentSecurityCategory;
+  eventType: string;
+  trxId: string;
+  paymentMethod: string;
+  submittedAmountBdt?: number;
+  matchedAmountBdt?: number;
+  senderPhone?: string;
+  receiverPhone?: string;
+  orderNumber?: string;
+  userEmail?: string;
+  reason: string;
+  source: 'sms_webhook' | 'admin_manual' | 'checkout_api' | 'orders_api';
+  ip?: string;
+  flagged: boolean;
+  createdAt: string;
 }
 
 export interface VerificationTimerState {
@@ -125,13 +151,69 @@ export const PAYMENT_LOCKED_MESSAGE =
 
 export const DEFAULT_ROBUX_PACKAGES: RobuxPackage[] = [
   {
+    id: 'pkg-gift-10',
+    robux: 800,
+    title: '10$ Gift Card',
+    tierLabel: 'Gift Card',
+    priceBdt: 1450,
+    originalPriceBdt: 1600,
+    deliveryNote: 'Instant Code',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: "Gift Card's",
+  },
+  {
+    id: 'pkg-gift-25',
+    robux: 2000,
+    title: '25$ Gift Card',
+    tierLabel: 'Gift Card',
+    priceBdt: 3520,
+    originalPriceBdt: 3800,
+    deliveryNote: 'Instant Code',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: "Gift Card's",
+  },
+  {
+    id: 'pkg-bf-boss',
+    robux: 350,
+    title: '2x Boss Drop',
+    tierLabel: 'Game Pass',
+    priceBdt: 300,
+    originalPriceBdt: 350,
+    deliveryNote: 'BloxFruits Gift',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: 'BloxFruits',
+  },
+  {
+    id: 'pkg-bf-mastery',
+    robux: 450,
+    title: '2x Mastery',
+    tierLabel: 'Game Pass',
+    priceBdt: 380,
+    originalPriceBdt: 450,
+    deliveryNote: 'BloxFruits Gift',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: 'BloxFruits',
+  },
+  {
+    id: 'pkg-bf-money',
+    robux: 450,
+    title: '2x Money',
+    tierLabel: 'Game Pass',
+    priceBdt: 380,
+    originalPriceBdt: 450,
+    deliveryNote: 'BloxFruits Gift',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: 'BloxFruits',
+  },
+  {
     id: 'pkg-400',
     robux: 400,
     title: '400 Robux',
     tierLabel: 'Starter Vault',
     priceBdt: 590,
     deliveryNote: 'Group Payout',
-    image: '',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: 'Robux',
   },
   {
     id: 'pkg-800',
@@ -140,7 +222,8 @@ export const DEFAULT_ROBUX_PACKAGES: RobuxPackage[] = [
     tierLabel: 'Standard Stack',
     priceBdt: 1180,
     deliveryNote: 'Most Selected',
-    image: '',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: 'Robux',
   },
   {
     id: 'pkg-1700',
@@ -149,7 +232,8 @@ export const DEFAULT_ROBUX_PACKAGES: RobuxPackage[] = [
     tierLabel: 'Titanium Vault',
     priceBdt: 2350,
     deliveryNote: 'Best Value',
-    image: '',
+    image: '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
+    category: 'Robux',
   },
 ];
 

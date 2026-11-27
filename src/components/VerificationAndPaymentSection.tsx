@@ -50,6 +50,8 @@ interface VerificationAndPaymentSectionProps {
     method: string;
     transactionId?: string;
     verified?: boolean;
+    flagged?: boolean;
+    flagMessage?: string;
   } | null;
   liveReceiptOrder?: OrderRecord | null;
   onRequireSignIn: () => void;
@@ -62,7 +64,7 @@ interface VerificationAndPaymentSectionProps {
   onClearPaymentError?: () => void;
   onSelectPayment: (id: string) => void;
   onShowOutOfStock?: () => void;
-  onCompleteOrder: (transactionId: string) => void | Promise<void>;
+  onCompleteOrder: (transactionId: string, senderPhone?: string) => void | Promise<void>;
 }
 
 export function VerificationAndPaymentSection({
@@ -97,6 +99,7 @@ export function VerificationAndPaymentSection({
   onCompleteOrder,
 }: VerificationAndPaymentSectionProps) {
   const [transactionIdInput, setTransactionIdInput] = useState('');
+  const [senderPhoneInput, setSenderPhoneInput] = useState('');
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [trxError, setTrxError] = useState<string | null>(null);
   const [showBkashPopup, setShowBkashPopup] = useState(false);
@@ -104,6 +107,7 @@ export function VerificationAndPaymentSection({
   useEffect(() => {
     if (orderReceipt) {
       setTransactionIdInput('');
+      setSenderPhoneInput('');
       setTrxError(null);
     }
   }, [orderReceipt]);
@@ -123,12 +127,12 @@ export function VerificationAndPaymentSection({
   return (
     <section
       id="verification"
-      className="py-20 border-t border-white/[0.08]"
+      className="py-20 border-t border-white/[0.06]"
       aria-labelledby="verification-heading"
     >
       <div className="max-w-6xl mx-auto px-6 space-y-12">
         <div className="max-w-2xl">
-          <p className="text-xs font-medium tracking-wide text-amber-400 mb-2">
+          <p className="text-xs font-medium tracking-wide text-violet-300 mb-2">
             Real-Time Roblox API Gate
           </p>
           <h2
@@ -143,7 +147,7 @@ export function VerificationAndPaymentSection({
         </div>
 
         {/* Verification & Timer Panel */}
-        <div className="rounded-xl bg-[#131820] border border-white/[0.08] p-6 sm:p-8 space-y-8">
+        <div className="rounded-2xl bg-[#110F1B] border border-white/[0.08] p-6 sm:p-8 space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
             <div>
               <span className="text-xs text-zinc-400">Active Package Selection</span>
@@ -151,7 +155,7 @@ export function VerificationAndPaymentSection({
                 <span className="font-display text-2xl font-bold text-zinc-100">
                   {selectedPackage.title}
                 </span>
-                <span className="font-mono text-lg font-semibold text-amber-400 tabular-nums">
+                <span className="font-mono text-lg font-semibold text-violet-300 tabular-nums">
                   ৳{selectedPackage.priceBdt} BDT
                 </span>
               </div>
@@ -168,7 +172,7 @@ export function VerificationAndPaymentSection({
                   isPaymentUnlocked
                     ? 'text-emerald-400'
                     : isGroupVerified
-                    ? 'text-amber-300'
+                    ? 'text-violet-300'
                     : 'text-zinc-300'
                 }`}
               >
@@ -205,9 +209,9 @@ export function VerificationAndPaymentSection({
               </div>
 
               {!isSignedIn && (
-                <div className="rounded-lg bg-amber-400/10 border border-amber-400/30 p-4 space-y-3">
-                  <div className="flex items-start gap-2.5 text-xs font-medium text-amber-200 leading-relaxed">
-                    <Lock className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" aria-hidden="true" />
+                <div className="rounded-xl bg-[#764AF1]/10 border border-[#764AF1]/30 p-4 space-y-3">
+                  <div className="flex items-start gap-2.5 text-xs font-medium text-violet-200 leading-relaxed">
+                    <Lock className="w-4 h-4 shrink-0 text-violet-300 mt-0.5" aria-hidden="true" />
                     <span>
                       Sign in required: You must sign in or create an account before you can verify your Roblox membership or buy any Robux.
                     </span>
@@ -215,7 +219,7 @@ export function VerificationAndPaymentSection({
                   <button
                     type="button"
                     onClick={onRequireSignIn}
-                    className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+                    className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-[#764AF1] px-4 py-2 text-xs font-semibold text-white hover:bg-[#855DF7] transition-colors"
                   >
                     <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Sign In / Create Account</span>
@@ -230,7 +234,7 @@ export function VerificationAndPaymentSection({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={onGroupLinkClick}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#764AF1] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1]"
                   >
                     <span>Join Community</span>
                     <ExternalLink className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -239,7 +243,7 @@ export function VerificationAndPaymentSection({
                   <button
                     type="button"
                     onClick={onRequireSignIn}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-zinc-800 border border-white/10 px-5 py-2.5 text-sm font-semibold text-zinc-300 hover:border-amber-400/50 hover:text-amber-300 transition-colors whitespace-nowrap shrink-0"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#1C1928] border border-white/10 px-5 py-2.5 text-sm font-semibold text-zinc-200 hover:border-[#764AF1]/60 hover:text-violet-200 transition-colors whitespace-nowrap shrink-0"
                   >
                     <Lock className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Sign In to Join Community</span>
@@ -265,7 +269,7 @@ export function VerificationAndPaymentSection({
               </div>
 
               {isSignedIn && !isGroupVerified && savedVerifiedTimers.length > 0 && (
-                <div className="rounded-lg bg-[#090B0E] border border-white/10 p-3 space-y-2">
+                <div className="rounded-xl bg-[#0A090F] border border-white/10 p-3 space-y-2">
                   <div className="text-[11px] font-medium text-zinc-400">
                     Previously Verified Roblox Accounts (no timer for completed accounts):
                   </div>
@@ -279,10 +283,10 @@ export function VerificationAndPaymentSection({
                           key={saved.robloxUsername.toLowerCase()}
                           type="button"
                           onClick={() => onSelectSavedUsername(saved)}
-                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                             isReady
                               ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300 hover:bg-emerald-500/20'
-                              : 'bg-amber-400/10 border-amber-400/35 text-amber-300 hover:bg-amber-400/20'
+                              : 'bg-[#764AF1]/15 border-[#764AF1]/35 text-violet-200 hover:bg-[#764AF1]/25'
                           }`}
                         >
                           <span className="font-mono">{saved.robloxUsername}</span>
@@ -301,7 +305,7 @@ export function VerificationAndPaymentSection({
                   htmlFor="inline-roblox-username"
                   className="block text-xs font-medium text-zinc-300 mb-2"
                 >
-                  Enter your Roblox Username <span className="text-amber-400">*</span>
+                  Enter your Roblox Username <span className="text-violet-300">*</span>
                 </label>
                 <input
                   id="inline-roblox-username"
@@ -315,7 +319,7 @@ export function VerificationAndPaymentSection({
                       ? 'Enter exact Roblox username'
                       : 'Sign in first to enter your Roblox username'
                   }
-                  className="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 disabled:opacity-60 transition-colors"
+                  className="w-full min-h-[44px] rounded-lg bg-[#0A090F] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1] focus:ring-1 focus:ring-[#764AF1] disabled:opacity-60 transition-colors"
                 />
               </div>
 
@@ -336,7 +340,7 @@ export function VerificationAndPaymentSection({
                   <button
                     type="button"
                     onClick={onRequireSignIn}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white transition-colors whitespace-nowrap"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors whitespace-nowrap"
                   >
                     <LogIn className="w-4 h-4" aria-hidden="true" />
                     <span>Sign In to Verify &amp; Buy</span>
@@ -346,7 +350,7 @@ export function VerificationAndPaymentSection({
                     type="button"
                     disabled={isVerifyingApi}
                     onClick={onVerifyMembership}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:opacity-60 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-60 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1]"
                   >
                     {isVerifyingApi ? (
                       <>
@@ -359,14 +363,14 @@ export function VerificationAndPaymentSection({
                   </button>
                 ) : (
                   <>
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-2 text-xs font-semibold text-emerald-300">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-2 text-xs font-semibold text-emerald-300">
                       <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                       Verified Member
                     </span>
                     <button
                       type="button"
                       onClick={onSwitchRobloxUsername}
-                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg bg-[#090B0E] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-amber-400/60 hover:text-amber-300 transition-colors"
+                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-[#0A090F] border border-white/15 px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:border-[#764AF1]/60 hover:text-violet-200 transition-colors"
                     >
                       <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
                       Use New Username
@@ -377,7 +381,7 @@ export function VerificationAndPaymentSection({
             </div>
 
             {/* Right: 15-Day Security Countdown Timer */}
-            <div className="lg:col-span-6 rounded-xl bg-[#0D1117] border border-white/[0.08] p-6 space-y-5">
+            <div className="lg:col-span-6 rounded-xl bg-[#161422] border border-white/[0.08] p-6 space-y-5">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="font-display text-lg font-semibold text-zinc-100">
@@ -396,7 +400,7 @@ export function VerificationAndPaymentSection({
                     isPaymentUnlocked
                       ? 'text-emerald-400'
                       : isGroupVerified
-                      ? 'text-amber-400'
+                      ? 'text-violet-300'
                       : 'text-zinc-600'
                   }`}
                   aria-hidden="true"
@@ -412,14 +416,14 @@ export function VerificationAndPaymentSection({
                 ].map((unit) => (
                   <div
                     key={unit.label}
-                    className="rounded-lg bg-[#131820] border border-white/[0.08] py-4 px-2 text-center"
+                    className="rounded-xl bg-[#110F1B] border border-white/[0.08] py-4 px-2 text-center"
                   >
                     <div
                       className={`font-mono text-2xl sm:text-3xl font-semibold tabular-nums ${
                         isPaymentUnlocked
                           ? 'text-emerald-400'
                           : isGroupVerified
-                          ? 'text-amber-300'
+                          ? 'text-violet-300'
                           : 'text-zinc-500'
                       }`}
                     >
@@ -443,7 +447,7 @@ export function VerificationAndPaymentSection({
                   <button
                     type="button"
                     onClick={onAdminUnlockTimer}
-                    className="w-full min-h-[42px] inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400/15 border border-amber-400/40 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/25 transition-colors"
+                    className="w-full min-h-[42px] inline-flex items-center justify-center gap-2 rounded-full bg-[#764AF1]/20 border border-[#764AF1]/40 px-4 py-2 text-xs font-semibold text-violet-200 hover:bg-[#764AF1]/30 transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5" aria-hidden="true" />
                     Admin: Complete Timer &amp; Unlock Payment
@@ -457,7 +461,7 @@ export function VerificationAndPaymentSection({
         {/* PAYMENT SECTION */}
         <div
           id="payment"
-          className={`rounded-xl bg-[#131820] border p-6 sm:p-8 space-y-6 transition-all duration-500 ${
+          className={`rounded-2xl bg-[#110F1B] border p-6 sm:p-8 space-y-6 transition-all duration-500 ${
             isOutOfStock
               ? 'border-red-500/50 bg-red-500/[0.04] stock-alert-red'
               : 'border-white/[0.08]'
@@ -499,7 +503,7 @@ export function VerificationAndPaymentSection({
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4 shrink-0 text-amber-400" aria-hidden="true" />
+                    <Lock className="w-4 h-4 shrink-0 text-violet-300" aria-hidden="true" />
                     <span>{PAYMENT_LOCKED_MESSAGE}</span>
                   </>
                 )}
@@ -550,16 +554,16 @@ export function VerificationAndPaymentSection({
                     }
                     onSelectPayment(option.id);
                   }}
-                  className={`flex flex-col justify-between text-left rounded-xl p-5 border transition-all min-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                  className={`flex flex-col justify-between text-left rounded-xl p-5 border transition-all min-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1] ${
                     isComingSoon
-                      ? 'bg-[#0D1117] border-white/[0.12] text-zinc-200 hover:border-amber-400/60 cursor-pointer'
+                      ? 'bg-[#161422] border-white/[0.12] text-zinc-200 hover:border-[#764AF1]/60 cursor-pointer'
                       : isDisabled
-                      ? 'bg-[#0D1117]/70 border-white/[0.06] text-zinc-500 cursor-not-allowed opacity-75'
+                      ? 'bg-[#161422]/70 border-white/[0.06] text-zinc-500 cursor-not-allowed opacity-75'
                       : isOutOfStock
-                      ? 'bg-[#0D1117] border-red-500/40 text-zinc-200 hover:border-red-400 cursor-pointer'
+                      ? 'bg-[#161422] border-red-500/40 text-zinc-200 hover:border-red-400 cursor-pointer'
                       : isSelected
-                      ? 'bg-[#0D1117] border-amber-400 text-zinc-100 shadow-lg shadow-amber-400/5'
-                      : 'bg-[#0D1117] border-white/[0.1] text-zinc-200 hover:border-white/25 cursor-pointer'
+                      ? 'bg-[#161422] border-[#764AF1] text-zinc-100 shadow-lg shadow-[#764AF1]/15'
+                      : 'bg-[#161422] border-white/[0.1] text-zinc-200 hover:border-white/25 cursor-pointer'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 w-full">
@@ -567,11 +571,11 @@ export function VerificationAndPaymentSection({
                       <CreditCard
                         className={`w-5 h-5 shrink-0 ${
                           isComingSoon
-                            ? 'text-amber-400'
+                            ? 'text-violet-300'
                             : isOutOfStock && isPaymentUnlocked
                             ? 'text-red-400'
                             : isPaymentUnlocked
-                            ? 'text-amber-400'
+                            ? 'text-violet-300'
                             : 'text-zinc-600'
                         }`}
                         aria-hidden="true"
@@ -581,7 +585,7 @@ export function VerificationAndPaymentSection({
                       </span>
                     </div>
                     {isComingSoon && (
-                      <span className="rounded bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                      <span className="rounded-full bg-[#764AF1]/15 border border-[#764AF1]/30 px-2.5 py-0.5 text-[10px] font-semibold text-violet-200">
                         Coming Soon
                       </span>
                     )}
@@ -593,7 +597,7 @@ export function VerificationAndPaymentSection({
 
                   <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2 w-full text-xs font-medium">
                     {isComingSoon ? (
-                      <span className="inline-flex items-center gap-1.5 text-amber-300">
+                      <span className="inline-flex items-center gap-1.5 text-violet-300">
                         <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         bKash is coming soon
                       </span>
@@ -610,7 +614,7 @@ export function VerificationAndPaymentSection({
                     ) : (
                       <span
                         className={
-                          isSelected ? 'text-amber-300' : 'text-emerald-400'
+                          isSelected ? 'text-violet-300' : 'text-emerald-400'
                         }
                       >
                         {isSelected ? 'Selected' : 'Available · Click to Select'}
@@ -628,26 +632,26 @@ export function VerificationAndPaymentSection({
           {isPaymentUnlocked && !orderReceipt && (
             <div className="space-y-4 pt-4 border-t border-white/[0.08]">
               <div
-                className={`rounded-lg bg-[#090B0E] border p-4 space-y-3 transition-colors duration-500 ${
-                  isOutOfStock ? 'border-red-500/45' : 'border-amber-400/30'
+                className={`rounded-xl bg-[#0A090F] border p-4 space-y-3 transition-colors duration-500 ${
+                  isOutOfStock ? 'border-red-500/45' : 'border-[#764AF1]/35'
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <span className="text-xs text-amber-400 font-semibold tracking-wide">
+                    <span className="text-xs text-violet-300 font-semibold tracking-wide">
                       Official Send Money Number ({selectedPaymentId ? selectedPaymentId.toUpperCase() : 'Nagad / Rocket'})
                     </span>
                     <div className="font-mono text-xl font-bold text-zinc-100 mt-0.5">
                       01764088123
                     </div>
                     <p className="text-xs text-zinc-400 mt-1">
-                      Copy this number, go to your Nagad or Rocket app, send <span className="text-amber-300 font-semibold">৳{selectedPackage.priceBdt} BDT</span>, and paste your Transaction ID below.
+                      Copy this number, go to your Nagad or Rocket app, send <span className="text-violet-300 font-semibold">৳{selectedPackage.priceBdt} BDT</span>, and paste your Transaction ID below.
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={handleCopyPhone}
-                    className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0"
+                    className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-[#764AF1] px-4 py-2 text-xs font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap shrink-0"
                   >
                     <Copy className="w-3.5 h-3.5" aria-hidden="true" />
                     {copiedPhone ? 'Copied Number!' : 'Copy Number'}
@@ -656,7 +660,7 @@ export function VerificationAndPaymentSection({
 
                 <div>
                   <label htmlFor="trx-id-input" className="block text-xs font-medium text-zinc-300 mb-1.5">
-                    Enter Transaction ID (TrxID) <span className="text-amber-400">*</span>
+                    Enter Transaction ID (TrxID) <span className="text-violet-300">*</span>
                   </label>
                   <input
                     id="trx-id-input"
@@ -669,11 +673,29 @@ export function VerificationAndPaymentSection({
                       onClearPaymentError?.();
                     }}
                     placeholder="e.g. 72A94K81M2 (exact TrxID from Nagad/Rocket SMS)"
-                    className="w-full min-h-[44px] rounded-lg bg-[#131820] border border-white/15 px-3.5 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400"
+                    className="w-full min-h-[44px] rounded-lg bg-[#110F1B] border border-white/15 px-3.5 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1]"
                   />
                   <p className="mt-1.5 text-[11px] text-zinc-400">
-                    Your TrxID is checked against payments received on <span className="font-mono text-zinc-200">01764088123</span>. Fake or random letters are rejected automatically.
+                    Your TrxID is checked server-side against payments received on <span className="font-mono text-zinc-200">01764088123</span>. Duplicate, fake, or mismatched transactions are rejected/flagged automatically.
                   </p>
+                </div>
+
+                <div>
+                  <label htmlFor="sender-phone-input" className="block text-xs font-medium text-zinc-300 mb-1.5">
+                    Sender Mobile Number <span className="text-zinc-500">(Optional · 01XXXXXXXXX)</span>
+                  </label>
+                  <input
+                    id="sender-phone-input"
+                    type="tel"
+                    value={senderPhoneInput}
+                    onChange={(e) => {
+                      setSenderPhoneInput(e.target.value);
+                      setTrxError(null);
+                      onClearPaymentError?.();
+                    }}
+                    placeholder="01XXXXXXXXX (number you sent money from)"
+                    className="w-full min-h-[44px] rounded-lg bg-[#110F1B] border border-white/15 px-3.5 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1]"
+                  />
                 </div>
               </div>
 
@@ -691,7 +713,7 @@ export function VerificationAndPaymentSection({
                     {selectedPackage.title}
                   </span>
                   :{' '}
-                  <span className="font-mono font-semibold text-amber-300 tabular-nums">
+                  <span className="font-mono font-semibold text-violet-300 tabular-nums">
                     ৳{selectedPackage.priceBdt} BDT
                   </span>
                 </div>
@@ -711,16 +733,21 @@ export function VerificationAndPaymentSection({
                       setTrxError('Please enter a valid Nagad/Rocket Transaction ID (at least 8 characters with numbers).');
                       return;
                     }
+                    const cleanSender = senderPhoneInput.replace(/[\s\-]/g, '').trim();
+                    if (cleanSender && !/^(\+?88)?01[3-9]\d{8}$/.test(cleanSender)) {
+                      setTrxError('Invalid Sender Number. Use an 11-digit BD number (e.g. 01XXXXXXXXX).');
+                      return;
+                    }
                     setTrxError(null);
                     onClearPaymentError?.();
-                    void onCompleteOrder(cleanTrx);
+                    void onCompleteOrder(cleanTrx, cleanSender || undefined);
                   }}
-                  className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                  className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1] ${
                     isOutOfStock
                       ? 'bg-red-500/20 border border-red-500/50 text-red-300 hover:bg-red-500/30'
                       : selectedPaymentId && transactionIdInput.trim() && !isVerifyingApi && !isSubmittingOrder
-                      ? 'bg-amber-400 text-zinc-950 hover:bg-amber-300'
-                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                      ? 'bg-[#764AF1] text-white hover:bg-[#855DF7]'
+                      : 'bg-[#1C1928] text-zinc-500 cursor-not-allowed'
                   }`}
                 >
                   {isOutOfStock ? (
@@ -756,38 +783,47 @@ export function VerificationAndPaymentSection({
               Boolean(orderReceipt.verified) ||
               liveStatus === 'Approved' ||
               liveStatus === 'Completed';
+            const isFlagged = Boolean(orderReceipt.flagged || liveReceiptOrder?.paymentFlag) && !isConfirmedByAdmin;
             const isDelivered = liveStatus === 'Completed';
             const isCancelled = liveStatus === 'Cancelled';
             return (
               <div
                 role="status"
-                className={`rounded-lg border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                className={`rounded-xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                   isCancelled
                     ? 'bg-red-500/10 border-red-500/30'
+                    : isFlagged
+                    ? 'bg-amber-500/10 border-amber-500/35'
                     : isConfirmedByAdmin
                     ? 'bg-emerald-500/10 border-emerald-500/30'
-                    : 'bg-amber-400/10 border-amber-400/30'
+                    : 'bg-[#764AF1]/10 border-[#764AF1]/30'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <CheckCircle2
-                    className={`w-5 h-5 shrink-0 mt-0.5 ${
-                      isCancelled
-                        ? 'text-red-400'
-                        : isConfirmedByAdmin
-                        ? 'text-emerald-400'
-                        : 'text-amber-400'
-                    }`}
-                    aria-hidden="true"
-                  />
+                  {isFlagged ? (
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" aria-hidden="true" />
+                  ) : (
+                    <CheckCircle2
+                      className={`w-5 h-5 shrink-0 mt-0.5 ${
+                        isCancelled
+                          ? 'text-red-400'
+                          : isConfirmedByAdmin
+                          ? 'text-emerald-400'
+                          : 'text-violet-300'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  )}
                   <div>
                     <p
                       className={`font-display text-base font-semibold ${
                         isCancelled
                           ? 'text-red-300'
+                          : isFlagged
+                          ? 'text-amber-300'
                           : isConfirmedByAdmin
                           ? 'text-emerald-300'
-                          : 'text-amber-300'
+                          : 'text-violet-200'
                       }`}
                     >
                       {isCancelled
@@ -796,6 +832,8 @@ export function VerificationAndPaymentSection({
                         ? `Order #${orderReceipt.orderId} Confirmed & Delivered!`
                         : isConfirmedByAdmin
                         ? `Order #${orderReceipt.orderId} Confirmed by Admin!`
+                        : isFlagged
+                        ? `Order #${orderReceipt.orderId} Pending Review (Flagged)`
                         : `Order #${orderReceipt.orderId} Submitted (Pending Admin Confirmation)`}
                     </p>
                     {orderReceipt.transactionId && (
@@ -810,21 +848,23 @@ export function VerificationAndPaymentSection({
                         ? 'Admin confirmed and completed your Robux delivery! Check your Roblox account balance.'
                         : isConfirmedByAdmin
                         ? 'Your order has been confirmed by Admin! Your Robux payout is approved for delivery.'
-                        : 'Order submitted! Once Admin confirms your order (or matches your payment SMS), your confirmation status will update automatically below.'}
+                        : isFlagged
+                        ? liveReceiptOrder?.paymentFlagReason || orderReceipt.flagMessage || 'Payment amount or sender details differed from the invoice and was flagged for Admin review.'
+                        : 'Order submitted! Once Admin confirms your order (or matches your payment SMS on 01764088123), your confirmation status will update automatically below.'}
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <a
                     href="#my-orders"
-                    className="min-h-[40px] inline-flex items-center justify-center rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap"
+                    className="min-h-[40px] inline-flex items-center justify-center rounded-full bg-[#764AF1] px-4 py-2 text-xs font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap"
                   >
                     Track Live Status
                   </a>
                   <button
                     type="button"
                     onClick={onStartAnotherOrder}
-                    className="min-h-[40px] rounded-lg bg-zinc-900 border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-colors whitespace-nowrap"
+                    className="min-h-[40px] rounded-full bg-[#1C1928] border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:bg-white/[0.08] transition-colors whitespace-nowrap"
                   >
                     Start Another Order
                   </button>
@@ -845,11 +885,11 @@ export function VerificationAndPaymentSection({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-xl bg-[#131820] border border-amber-400/40 p-6 shadow-2xl space-y-4"
+            className="w-full max-w-sm rounded-2xl bg-[#110F1B] border border-[#764AF1]/40 p-6 shadow-2xl space-y-4"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-400/15 text-amber-400 border border-amber-400/30">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#764AF1]/15 text-violet-300 border border-[#764AF1]/30">
                   <Sparkles className="w-5 h-5" aria-hidden="true" />
                 </div>
                 <div>
@@ -859,7 +899,7 @@ export function VerificationAndPaymentSection({
                   >
                     bKash is Coming Soon
                   </h4>
-                  <p className="text-xs text-amber-300 font-medium">
+                  <p className="text-xs text-violet-300 font-medium">
                     Payment Method Notice
                   </p>
                 </div>
@@ -868,20 +908,20 @@ export function VerificationAndPaymentSection({
                 type="button"
                 aria-label="Close message"
                 onClick={() => setShowBkashPopup(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <p className="text-sm text-zinc-300 leading-relaxed">
-              bKash payment is coming soon! Please select <span className="font-semibold text-amber-300">Nagad</span> or <span className="font-semibold text-amber-300">Rocket</span> (<span className="font-mono text-zinc-100">01764088123</span>) to complete your order right now.
+              bKash payment is coming soon! Please select <span className="font-semibold text-violet-300">Nagad</span> or <span className="font-semibold text-violet-300">Rocket</span> (<span className="font-mono text-zinc-100">01764088123</span>) to complete your order right now.
             </p>
 
             <button
               type="button"
               onClick={() => setShowBkashPopup(false)}
-              className="w-full min-h-[42px] rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+              className="w-full min-h-[42px] rounded-full bg-[#764AF1] px-4 py-2 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors"
             >
               Okay, Got It
             </button>

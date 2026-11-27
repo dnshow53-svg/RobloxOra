@@ -1,12 +1,17 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowRight,
   CheckCircle2,
-  ChevronDown,
+  ChevronRight,
+  Clock,
+  Headphones,
   LogIn,
   Moon,
+  Search,
   Shield,
+  ShieldCheck,
+  ShoppingBag,
+  SlidersHorizontal,
   Sun,
   User,
   X,
@@ -21,6 +26,7 @@ import {
   OrderRecord,
   OrderStatus,
   PAYMENT_OPTIONS,
+  PaymentSecurityLog,
   RegisteredUser,
   RobuxPackage,
   SessionState,
@@ -61,17 +67,20 @@ import {
   isFirebaseAdminConnected,
   removeStoreOrder,
   removeStorePackage,
+  reserveUniqueTrxIdInFirestore,
   saveStoreGroupSettings,
   signInAdminWithGoogle,
   subscribeFirebaseAuth,
+  subscribePaymentSecurityLogs,
   subscribeStoreOrders,
   subscribeStorePackages,
   subscribeStoreSettings,
+  upsertPaymentSecurityLog,
   upsertStoreOrder,
   upsertStorePackage,
 } from './firebase';
 import { verifyRobloxMembership } from './utils/robloxApi';
-import { ResilientImage, RobuxMark } from './components/RobuxIcon';
+import { BrandShardLogo, ResilientImage, RobuxMark } from './components/RobuxIcon';
 import { VerificationAndPaymentSection } from './components/VerificationAndPaymentSection';
 import type { AuthModalMode } from './components/AuthModal';
 import { CustomerOrdersSection } from './components/CustomerOrdersSection';
@@ -88,8 +97,29 @@ const ProfileModal = lazy(() =>
 const AdminDashboard = lazy(() =>
   import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 );
-import { LoyaltyTierBar } from './components/LoyaltyTierBar';
 import { RestockCountdownCard } from './components/RestockCountdownCard';
+
+export const DEFAULT_PRODUCT_IMAGE = '/src/assets/images/pkg_starter_vault_1795779453204.jpg';
+
+function sanitizeImage(url?: string): string {
+  if (typeof url !== 'string') return DEFAULT_PRODUCT_IMAGE;
+  const trimmed = url.trim();
+  if (!trimmed) return DEFAULT_PRODUCT_IMAGE;
+  return trimmed;
+}
+
+const VAULT_ARTWORKS = [DEFAULT_PRODUCT_IMAGE];
+
+function formatRelativeAgo(isoString: string): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 1000));
+  if (diffSec < 90) return 'just now';
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 const FAQ_ITEMS = [
   {
@@ -181,11 +211,15 @@ export default function App() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [verifiedPayments, setVerifiedPayments] = useState<VerifiedPaymentRecord[]>([]);
+  const [paymentSecurityLogs, setPaymentSecurityLogs] = useState<PaymentSecurityLog[]>([]);
+  const [adminToken, setAdminToken] = useState<string | null>(null);
   const [orderReceipt, setOrderReceipt] = useState<{
     orderId: string;
     method: string;
     transactionId?: string;
     verified?: boolean;
+    flagged?: boolean;
+    flagMessage?: string;
   } | null>(null);
   const [outOfStockAlert, setOutOfStockAlert] = useState<{
     available: number;
@@ -197,6 +231,11 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [headerAvatarBroken, setHeaderAvatarBroken] = useState(false);
+  const [currentView, setCurrentView] = useState<'store' | 'marketplace'>('store');
+  const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const [marketCategory, setMarketCategory] = useState('All Games');
+  const [marketSearch, setMarketSearch] = useState('');
+  const [marketSort, setMarketSort] = useState('Default');
 
   // Global interactive animations on every button & clickable element
   useEffect(() => {
@@ -232,6 +271,10 @@ export default function App() {
           'radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(52, 211, 153, 0.6) 45%, transparent 70%)';
       } else if (
         classList.includes('zinc-') ||
+        classList.includes('bg-[#110F1B]') ||
+        classList.includes('bg-[#161422]') ||
+        classList.includes('bg-[#0A090F]') ||
+        classList.includes('bg-[#1C1928]') ||
         classList.includes('bg-[#131820]') ||
         classList.includes('bg-[#090B0E]') ||
         classList.includes('bg-white/') ||
@@ -390,6 +433,21 @@ export default function App() {
   const syncEpochRef = useRef(0);
   const cloudOrderIdsRef = useRef<Set<string>>(new Set());
   const isSwitchingUsernameRef = useRef(false);
+  const adminTokenRef = useRef<string | null>(null);
+  adminTokenRef.current = adminToken;
+  const paymentSecurityLogsRef = useRef(paymentSecurityLogs);
+  paymentSecurityLogsRef.current = paymentSecurityLogs;
+
+  const getAdminAuthHeaders = useCallback((includeJson = true): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (includeJson) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (adminTokenRef.current) {
+      headers.Authorization = `Bearer ${adminTokenRef.current}`;
+    }
+    return headers;
+  }, []);
 
   const persistUserVerificationTimer = useCallback(
     (
@@ -979,7 +1037,11 @@ export default function App() {
     isSyncingRef.current = true;
     const startEpoch = syncEpochRef.current;
     try {
-      const res = await fetch('/api/store', { cache: 'no-store' });
+      const fetchHeaders: Record<string, string> = {};
+      if (adminTokenRef.current) {
+        fetchHeaders.Authorization = `Bearer ${adminTokenRef.current}`;
+      }
+      const res = await fetch('/api/store', { cache: 'no-store', headers: fetchHeaders });
       if (!res.ok) return;
       const serverData = (await res.json()) as {
         packages?: RobuxPackage[];
@@ -988,6 +1050,7 @@ export default function App() {
         users?: RegisteredUser[];
         groupSettings?: GroupSettings;
         verifiedPayments?: VerifiedPaymentRecord[];
+        paymentSecurityLogs?: PaymentSecurityLog[];
       };
 
       if (Array.isArray(serverData.deletedOrderIds) && serverData.deletedOrderIds.length > 0) {
@@ -996,6 +1059,10 @@ export default function App() {
 
       if (Array.isArray(serverData.verifiedPayments)) {
         setVerifiedPayments(serverData.verifiedPayments);
+      }
+
+      if (Array.isArray(serverData.paymentSecurityLogs)) {
+        setPaymentSecurityLogs(serverData.paymentSecurityLogs);
       }
 
       const serverUsers = Array.isArray(serverData.users)
@@ -1115,9 +1182,12 @@ export default function App() {
         : [];
       for (const so of rawServerOrders) {
         if (deletedOrderIds.has(so.id)) {
-          await fetch(`/api/orders/${encodeURIComponent(so.id)}`, {
-            method: 'DELETE',
-          }).catch(() => {});
+          if (sessionRef.current?.role === 'admin' && adminTokenRef.current) {
+            await fetch(`/api/orders/${encodeURIComponent(so.id)}`, {
+              method: 'DELETE',
+              headers: getAdminAuthHeaders(false),
+            }).catch(() => {});
+          }
           if (isCloudConnectedRef.current) {
             void removeStoreOrder(so.id).catch(() => {});
           }
@@ -1261,6 +1331,28 @@ export default function App() {
         for (const ord of sortedOrders) {
           if (!cloudOrderIdsRef.current.has(ord.id)) {
             void upsertStoreOrder(ord).catch(() => {});
+            if (ord.transactionId && ord.status !== 'Waiting' && ord.status !== 'Cancelled') {
+              const normMethod: 'Nagad' | 'Rocket' | 'bKash' =
+                ord.paymentMethod.toLowerCase().includes('rocket')
+                  ? 'Rocket'
+                  : ord.paymentMethod.toLowerCase().includes('bkash')
+                  ? 'bKash'
+                  : 'Nagad';
+              void reserveUniqueTrxIdInFirestore({
+                trxId: ord.transactionId,
+                method: normMethod,
+                orderId: ord.id,
+                orderNumber: ord.orderNumber,
+                userEmail: ord.userEmail,
+                amountBdt: ord.priceBdt,
+                status: ord.paymentFlag
+                  ? 'flagged_mismatch'
+                  : ord.paymentVerified || ord.status === 'Approved' || ord.status === 'Completed'
+                  ? 'verified_approved'
+                  : 'reserved_pending',
+                usedAt: ord.confirmedAt || ord.createdAt,
+              }).catch(() => {});
+            }
           }
         }
       }
@@ -1354,12 +1446,15 @@ export default function App() {
         ? serverData.packages
         : [];
 
-      // If any package was explicitly deleted locally, propagate deletion to server
-      for (const sp of serverPackagesRaw) {
-        if (deletedPkgIds.has(sp.id)) {
-          await fetch(`/api/packages/${encodeURIComponent(sp.id)}`, {
-            method: 'DELETE',
-          }).catch(() => {});
+      // If any package was explicitly deleted locally by Admin, propagate deletion to server
+      if (sessionRef.current?.role === 'admin' && adminTokenRef.current) {
+        for (const sp of serverPackagesRaw) {
+          if (deletedPkgIds.has(sp.id)) {
+            await fetch(`/api/packages/${encodeURIComponent(sp.id)}`, {
+              method: 'DELETE',
+              headers: getAdminAuthHeaders(false),
+            }).catch(() => {});
+          }
         }
       }
 
@@ -1373,23 +1468,26 @@ export default function App() {
         serverPkgMap.set(sp.id, sp);
       }
 
-      // Push any local custom/dirty packages that are missing on server (e.g. after server restart)
-      const packagesToPush = localPackages.filter((lp) => {
-        if (deletedPkgIds.has(lp.id) || inFlightDeletedPackageIdsRef.current.has(lp.id)) {
-          return false;
-        }
-        const onServer = serverPkgMap.get(lp.id);
-        if (!onServer) {
-          return !pushedPkgIds.has(lp.id) || !defaultIds.has(lp.id);
-        }
-        return !pushedPkgIds.has(lp.id);
-      });
+      // Push any local custom/dirty packages that are missing on server (only when Admin is authenticated)
+      const packagesToPush =
+        sessionRef.current?.role === 'admin' && adminTokenRef.current
+          ? localPackages.filter((lp) => {
+              if (deletedPkgIds.has(lp.id) || inFlightDeletedPackageIdsRef.current.has(lp.id)) {
+                return false;
+              }
+              const onServer = serverPkgMap.get(lp.id);
+              if (!onServer) {
+                return !pushedPkgIds.has(lp.id) || !defaultIds.has(lp.id);
+              }
+              return !pushedPkgIds.has(lp.id);
+            })
+          : [];
 
       for (const mp of packagesToPush) {
         try {
           const postRes = await fetch('/api/packages', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAdminAuthHeaders(),
             body: JSON.stringify(mp),
           });
           if (postRes.ok) {
@@ -1444,7 +1542,7 @@ export default function App() {
     } finally {
       isSyncingRef.current = false;
     }
-  }, []);
+  }, [getAdminAuthHeaders, persistUserVerificationTimer]);
 
   useEffect(() => {
     void syncFromServer();
@@ -1498,7 +1596,32 @@ export default function App() {
       for (const ord of currentOrders) {
         if (!deletedOrders.has(ord.id) && !inFlightDeletedOrderIdsRef.current.has(ord.id)) {
           await upsertStoreOrder(ord);
+          if (ord.transactionId && ord.status !== 'Waiting' && ord.status !== 'Cancelled') {
+            const normMethod: 'Nagad' | 'Rocket' | 'bKash' =
+              ord.paymentMethod.toLowerCase().includes('rocket')
+                ? 'Rocket'
+                : ord.paymentMethod.toLowerCase().includes('bkash')
+                ? 'bKash'
+                : 'Nagad';
+            await reserveUniqueTrxIdInFirestore({
+              trxId: ord.transactionId,
+              method: normMethod,
+              orderId: ord.id,
+              orderNumber: ord.orderNumber,
+              userEmail: ord.userEmail,
+              amountBdt: ord.priceBdt,
+              status: ord.paymentFlag
+                ? 'flagged_mismatch'
+                : ord.paymentVerified || ord.status === 'Approved' || ord.status === 'Completed'
+                ? 'verified_approved'
+                : 'reserved_pending',
+              usedAt: ord.confirmedAt || ord.createdAt,
+            }).catch(() => {});
+          }
         }
+      }
+      for (const logItem of paymentSecurityLogsRef.current.slice(0, 60)) {
+        await upsertPaymentSecurityLog(logItem).catch(() => {});
       }
     } catch {
       // Handled via handleFirestoreError logs
@@ -1589,8 +1712,51 @@ export default function App() {
       saveOrders(merged);
     });
 
-    return () => unsubOrders();
+    const unsubSecurityLogs = subscribePaymentSecurityLogs((cloudLogs) => {
+      setPaymentSecurityLogs((prev) => {
+        const byId = new Map<string, PaymentSecurityLog>();
+        for (const item of cloudLogs) byId.set(item.id, item);
+        for (const item of prev) {
+          if (!byId.has(item.id)) byId.set(item.id, item);
+        }
+        return Array.from(byId.values())
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 250);
+      });
+    });
+
+    return () => {
+      unsubOrders();
+      unsubSecurityLogs();
+    };
   }, [isAdmin, isCloudConnected, syncAllToFirestore]);
+
+  useEffect(() => {
+    if (!isAdmin || !isCloudConnected || !firebaseUser || adminToken) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const firebaseIdToken = await firebaseUser.getIdToken();
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firebaseIdToken }),
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json().catch(() => ({}))) as { token?: string };
+        if (data.token && !cancelled) {
+          adminTokenRef.current = data.token;
+          setAdminToken(data.token);
+          void syncFromServer();
+        }
+      } catch {
+        // Admin can still sign in manually when prompted
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, isCloudConnected, firebaseUser, adminToken, syncFromServer]);
 
   const handleConnectCloud = async (forceSelect = false) => {
     try {
@@ -1608,6 +1774,19 @@ export default function App() {
     setAuthModalMode(mode);
     setAuthNotice(notice);
     setIsAuthModalOpen(true);
+  };
+
+  const promptAdminReauthIfNeeded = (res: Response): boolean => {
+    if (res.status === 401) {
+      adminTokenRef.current = null;
+      setAdminToken(null);
+      handleOpenAuth(
+        'admin',
+        'Admin server authorization expired or is missing. Enter your Admin password to continue.'
+      );
+      return true;
+    }
+    return false;
   };
 
   const handleUserSignIn = (user: RegisteredUser) => {
@@ -1644,7 +1823,9 @@ export default function App() {
     }
   };
 
-  const handleAdminSignIn = (email: string) => {
+  const handleAdminSignIn = (email: string, token: string) => {
+    adminTokenRef.current = token;
+    setAdminToken(token);
     const nextSession: SessionState = { role: 'admin', email };
     setSession(nextSession);
     saveSession(nextSession);
@@ -1658,6 +1839,10 @@ export default function App() {
 
   const handleSignOut = () => {
     isSwitchingUsernameRef.current = false;
+    adminTokenRef.current = null;
+    setAdminToken(null);
+    setVerifiedPayments([]);
+    setPaymentSecurityLogs([]);
     setSession(null);
     saveSession(null);
     setTimerState({ ...EMPTY_TIMER_STATE });
@@ -1776,7 +1961,7 @@ export default function App() {
     }
   };
 
-  // Admin Handlers (localStorage + Express /api sync + Firestore Cloud sync)
+  // Admin Handlers (localStorage + authenticated Express /api sync + Firestore Cloud sync)
   const handleAddPackage = async (pkg: RobuxPackage) => {
     clearPackageIdDeleted(pkg.id);
     inFlightPackageIdsRef.current.add(pkg.id);
@@ -1786,10 +1971,10 @@ export default function App() {
     try {
       const res = await fetch('/api/packages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(pkg),
       });
-      if (res.ok) {
+      if (!promptAdminReauthIfNeeded(res) && res.ok) {
         markPackageIdPushed(pkg.id);
       }
     } catch {
@@ -1809,17 +1994,19 @@ export default function App() {
     try {
       const res = await fetch(`/api/packages/${encodeURIComponent(updatedPkg.id)}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           priceBdt: updatedPkg.priceBdt,
           deliveryNote: updatedPkg.deliveryNote,
           image: updatedPkg.image,
         }),
       });
-      if (res.status === 404) {
+      if (promptAdminReauthIfNeeded(res)) {
+        // Re-auth modal triggered
+      } else if (res.status === 404) {
         const postRes = await fetch('/api/packages', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify(updatedPkg),
         });
         if (postRes.ok) markPackageIdPushed(updatedPkg.id);
@@ -1845,9 +2032,11 @@ export default function App() {
       setSelectedPackageId(next[0].id);
     }
     try {
-      await fetch(`/api/packages/${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/packages/${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        headers: getAdminAuthHeaders(false),
       });
+      promptAdminReauthIfNeeded(res);
     } catch {
       // preserved in localStorage
     }
@@ -1866,12 +2055,17 @@ export default function App() {
       ? existingOrder?.confirmedAt || new Date().toISOString()
       : existingOrder?.confirmedAt;
     const nextOrder: OrderRecord | null = existingOrder
-      ? { ...existingOrder, status, confirmedAt: optimisticConfirmedAt }
+      ? {
+          ...existingOrder,
+          status,
+          paymentVerified: isConfirmed ? true : existingOrder.paymentVerified,
+          paymentFlag: isConfirmed ? undefined : existingOrder.paymentFlag,
+          paymentFlagReason: isConfirmed ? undefined : existingOrder.paymentFlagReason,
+          confirmedAt: optimisticConfirmedAt,
+        }
       : null;
     const next = ordersRef.current.map((o) =>
-      o.id === orderId
-        ? { ...o, status, confirmedAt: optimisticConfirmedAt }
-        : o
+      o.id === orderId && nextOrder ? nextOrder : o
     );
     setOrders(next);
     saveOrders(next);
@@ -1879,18 +2073,20 @@ export default function App() {
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ status, adminAction: true }),
       });
 
       let savedPayload: OrderRecord | null = null;
-      if (res.status === 404 && nextOrder) {
+      if (promptAdminReauthIfNeeded(res)) {
+        // Re-auth modal triggered
+      } else if (res.status === 404 && nextOrder) {
         const postRes = await fetch('/api/orders', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify({ ...nextOrder, adminAction: true }),
         });
-        if (postRes.ok) {
+        if (!promptAdminReauthIfNeeded(postRes) && postRes.ok) {
           markOrderIdPushed(orderId);
           savedPayload = (await postRes.json().catch(() => null)) as OrderRecord | null;
         }
@@ -1914,6 +2110,24 @@ export default function App() {
 
       if (isCloudConnectedRef.current && nextOrder) {
         await upsertStoreOrder(nextOrder).catch(() => {});
+        if (nextOrder.transactionId && isConfirmed) {
+          const normMethod: 'Nagad' | 'Rocket' | 'bKash' =
+            nextOrder.paymentMethod.toLowerCase().includes('rocket')
+              ? 'Rocket'
+              : nextOrder.paymentMethod.toLowerCase().includes('bkash')
+              ? 'bKash'
+              : 'Nagad';
+          await reserveUniqueTrxIdInFirestore({
+            trxId: nextOrder.transactionId,
+            method: normMethod,
+            orderId: nextOrder.id,
+            orderNumber: nextOrder.orderNumber,
+            userEmail: nextOrder.userEmail,
+            amountBdt: nextOrder.priceBdt,
+            status: 'verified_approved',
+            usedAt: optimisticConfirmedAt,
+          }).catch(() => {});
+        }
       }
     } catch {
       // offline fallback preserved
@@ -1991,13 +2205,15 @@ export default function App() {
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ unlockAtMs: nowMs, adminAction: true }),
       });
-      if (res.status === 404 && nextOrder) {
+      if (promptAdminReauthIfNeeded(res)) {
+        // Re-auth modal triggered
+      } else if (res.status === 404 && nextOrder) {
         const postRes = await fetch('/api/orders', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify({ ...nextOrder, adminAction: true }),
         });
         if (postRes.ok) markOrderIdPushed(orderId);
@@ -2023,7 +2239,11 @@ export default function App() {
     saveOrders(next);
     void fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
       method: 'DELETE',
+      headers: getAdminAuthHeaders(false),
     })
+      .then((res) => {
+        promptAdminReauthIfNeeded(res);
+      })
       .catch(() => {})
       .finally(async () => {
         if (isCloudConnectedRef.current) {
@@ -2043,11 +2263,14 @@ export default function App() {
     setGroupSettings(stamped);
     saveGroupSettings(stamped);
     try {
-      await fetch('/api/group-settings', {
+      const res = await fetch('/api/group-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(stamped),
-      }).catch(() => {});
+      }).catch(() => null);
+      if (res) {
+        promptAdminReauthIfNeeded(res);
+      }
       if (isCloudConnectedRef.current) {
         await saveStoreGroupSettings(stamped).catch(() => {});
       }
@@ -2065,9 +2288,12 @@ export default function App() {
     try {
       const res = await fetch('/api/payments/ledger', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(payload),
       });
+      if (promptAdminReauthIfNeeded(res)) {
+        return { ok: false, error: 'Admin password required to record payment ledger entries.' };
+      }
       const contentType = res.headers.get('content-type') || '';
       const data = contentType.includes('application/json')
         ? ((await res.json().catch(() => ({}))) as {
@@ -2088,9 +2314,11 @@ export default function App() {
   const handleDeleteVerifiedPayment = async (id: string) => {
     setVerifiedPayments((prev) => prev.filter((p) => p.id !== id));
     try {
-      await fetch(`/api/payments/ledger/${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/payments/ledger/${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        headers: getAdminAuthHeaders(false),
       });
+      promptAdminReauthIfNeeded(res);
     } catch {
       // ignore offline
     }
@@ -2342,7 +2570,7 @@ export default function App() {
     setOrderReceipt(null);
   };
 
-  const handleCompleteOrder = async (transactionId: string) => {
+  const handleCompleteOrder = async (transactionId: string, senderPhone?: string) => {
     if (!session) {
       requireSignInPrompt();
       return;
@@ -2363,10 +2591,10 @@ export default function App() {
       return;
     }
 
-    // Hard check live Robux stock before checking TrxID or placing any order
+    // Hard check live Robux stock before submitting payment
     let liveAvailable = groupSettings?.availableRobux ?? 25400;
     try {
-      const stockRes = await fetch('/api/store');
+      const stockRes = await fetch('/api/store', { cache: 'no-store' });
       if (stockRes.ok) {
         const latestStore = (await stockRes.json()) as { groupSettings?: GroupSettings };
         if (
@@ -2383,10 +2611,10 @@ export default function App() {
         }
       }
     } catch {
-      // fall back to current state
+      // handled below during atomic server submission
     }
 
-    if (liveAvailable <= 0 || selectedPackage.robux > liveAvailable) {
+    if (!isAdmin && (liveAvailable <= 0 || selectedPackage.robux > liveAvailable)) {
       setOutOfStockAlert({
         available: Math.max(0, liveAvailable),
         needed: selectedPackage.robux,
@@ -2400,12 +2628,13 @@ export default function App() {
       setPaymentError('Please enter your Transaction ID (TrxID) from your Nagad/Rocket SMS.');
       return;
     }
+    const cleanSenderPhone = typeof senderPhone === 'string' ? senderPhone.trim() : '';
 
     setPaymentError(null);
     setIsSubmittingOrder(true);
 
     try {
-      // Re-verify automatically before completing payment (for non-admin customers verified via live Roblox userId)
+      // Re-verify Roblox community membership automatically before completing payment
       if (!isAdmin && timerState.robloxUserId !== null) {
         setIsVerifyingApi(true);
         const stillJoined = await verifyStillMemberInBackground(
@@ -2434,211 +2663,174 @@ export default function App() {
         ? existingWaiting.orderNumber
         : `BM-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // Verify TrxID format, duplicate check, and live 01764088123 Nagad/Rocket SMS inbox match
-      let isPaymentVerified = false;
-      let nextStatus: OrderStatus = 'Pending';
-      let finalTrxId = cleanTrxId;
-
-      let usedFallbackValidation = false;
-      try {
-        const verifyRes = await fetch('/api/payments/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            method: methodLabel,
-            trxId: cleanTrxId,
-            expectedAmountBdt: selectedPackage.priceBdt,
-            orderNumber,
-          }),
-        });
-
-        const contentType = verifyRes.headers.get('content-type') || '';
-        if (verifyRes.status !== 404 && contentType.includes('application/json')) {
-          const verifyData = (await verifyRes.json()) as {
-            valid?: boolean;
-            verified?: boolean;
-            normalizedTrxId?: string;
-            status?: OrderStatus;
-            error?: string;
-          };
-
-          if (!verifyRes.ok || !verifyData.valid) {
-            setPaymentError(
-              verifyData.error ||
-                'Invalid Transaction ID. Please copy the exact TrxID from your 01764088123 Nagad/Rocket payment SMS.'
-            );
-            return;
-          }
-
-          isPaymentVerified = Boolean(verifyData.verified);
-          nextStatus = isPaymentVerified ? 'Approved' : 'Pending';
-          finalTrxId = verifyData.normalizedTrxId || cleanTrxId;
-        } else {
-          usedFallbackValidation = true;
-        }
-      } catch {
-        usedFallbackValidation = true;
-      }
-
-      if (usedFallbackValidation) {
-        if (!/^[A-Z0-9]{8,20}$/.test(cleanTrxId) || (cleanTrxId.match(/\d/g) || []).length < 2) {
-          setPaymentError(
-            'Invalid Transaction ID format. Please enter the exact 8–20 character TrxID from your Nagad/Rocket SMS.'
-          );
-          return;
-        }
-        const duplicate = orders.find(
-          (o) =>
-            o.status !== 'Cancelled' &&
-            (o.transactionId || '').trim().toUpperCase() === cleanTrxId
-        );
-        if (duplicate) {
-          setPaymentError(
-            `Transaction ID ${cleanTrxId} has already been used for Order ${duplicate.orderNumber}.`
-          );
-          return;
-        }
-      }
-
-      if (existingWaiting) {
-        const updatedOrder: OrderRecord = {
-          ...existingWaiting,
-          packageId: selectedPackage.id,
-          packageTitle: selectedPackage.title,
-          robuxAmount: selectedPackage.robux,
-          priceBdt: selectedPackage.priceBdt,
-          paymentMethod: methodLabel,
-          transactionId: finalTrxId,
-          paymentVerified: isPaymentVerified,
-          status: nextStatus,
-        };
-        const nextOrders = orders.map((o) =>
-          o.id === existingWaiting.id ? updatedOrder : o
-        );
-        syncEpochRef.current += 1;
-        setOrders(nextOrders);
-        saveOrders(nextOrders);
-        setOrderReceipt({
-          orderId: existingWaiting.orderNumber,
+      // Fail-closed server-side payment verification & atomic unique-TrxID reservation
+      const submitRes = await fetch('/api/payments/submit-order', {
+        method: 'POST',
+        headers: adminTokenRef.current
+          ? {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${adminTokenRef.current}`,
+            }
+          : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           method: methodLabel,
-          transactionId: finalTrxId,
-          verified: isPaymentVerified,
-        });
+          trxId: cleanTrxId,
+          senderPhone: cleanSenderPhone || undefined,
+          packageId: selectedPackage.id,
+          expectedAmountBdt: selectedPackage.priceBdt,
+          userEmail,
+          userName: currentUser ? currentUser.name : 'Store Admin',
+          userPhone: currentUser ? currentUser.phone : '',
+          robloxUsername:
+            timerState.robloxUsername.trim() ||
+            (isAdmin ? 'Admin Test' : 'Verified Member'),
+          robloxUserId: timerState.robloxUserId,
+          existingWaitingOrderId: existingWaiting?.id,
+          orderNumber,
+          verifiedAtMs: timerState.verifiedAtMs || undefined,
+          unlockAtMs: timerState.unlockAtMs || undefined,
+        }),
+      });
 
-        inFlightOrderIdsRef.current.add(existingWaiting.id);
-        try {
-          await fetch(`/api/orders/${encodeURIComponent(existingWaiting.id)}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              packageId: selectedPackage.id,
-              packageTitle: selectedPackage.title,
-              robuxAmount: selectedPackage.robux,
-              priceBdt: selectedPackage.priceBdt,
-              paymentMethod: methodLabel,
-              transactionId: finalTrxId,
-              paymentVerified: isPaymentVerified,
-              status: nextStatus,
-            }),
-          });
-          if (isCloudConnectedRef.current) {
-            await upsertStoreOrder(updatedOrder).catch(() => {});
-          }
-        } catch {
-          // ignore offline
-        } finally {
-          inFlightOrderIdsRef.current.delete(existingWaiting.id);
-        }
-        void syncFromServer();
+      const contentType = submitRes.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setPaymentError(
+          'Server payment verification is required and unavailable right now. No payment can be approved offline.'
+        );
         return;
       }
 
-      const newOrder: OrderRecord = {
-        id: `ord-${Date.now()}`,
-        orderNumber,
-        userEmail,
-        userName: currentUser ? currentUser.name : 'Store Admin',
-        userPhone: currentUser ? currentUser.phone : '',
-        robloxUsername:
-          timerState.robloxUsername.trim() ||
-          (isAdmin ? 'Admin Test' : 'Verified Member'),
-        robloxUserId: timerState.robloxUserId,
-        packageId: selectedPackage.id,
-        packageTitle: selectedPackage.title,
-        robuxAmount: selectedPackage.robux,
-        priceBdt: selectedPackage.priceBdt,
-        paymentMethod: methodLabel,
-        transactionId: finalTrxId,
-        paymentVerified: isPaymentVerified,
-        status: nextStatus,
-        verifiedAtMs: timerState.verifiedAtMs || undefined,
-        unlockAtMs: timerState.unlockAtMs || undefined,
-        createdAt: new Date().toISOString(),
+      const submitData = (await submitRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        valid?: boolean;
+        verified?: boolean;
+        flagged?: boolean;
+        flagMessage?: string;
+        normalizedTrxId?: string;
+        status?: OrderStatus;
+        order?: OrderRecord;
+        error?: string;
       };
 
-      inFlightOrderIdsRef.current.add(newOrder.id);
+      if (!submitRes.ok || !submitData.ok || !submitData.order) {
+        setPaymentError(
+          submitData.error ||
+            'Payment verification failed. Please double-check your TrxID from 01764088123 and try again.'
+        );
+        return;
+      }
+
+      const savedOrder: OrderRecord = {
+        ...submitData.order,
+        status: normalizeOrderStatus(submitData.order.status),
+        priceBdt: Number(submitData.order.priceBdt) || selectedPackage.priceBdt,
+        robuxAmount: Number(submitData.order.robuxAmount) || selectedPackage.robux,
+        paymentVerified: Boolean(submitData.verified),
+      };
+
+      markOrderIdPushed(savedOrder.id);
       syncEpochRef.current += 1;
-      const nextOrders = [newOrder, ...orders];
+      const nextOrders = existingWaiting
+        ? orders.map((o) => (o.id === existingWaiting.id ? savedOrder : o))
+        : [savedOrder, ...orders.filter((o) => o.id !== savedOrder.id)];
       setOrders(nextOrders);
       saveOrders(nextOrders);
+
       setOrderReceipt({
-        orderId: orderNumber,
+        orderId: savedOrder.orderNumber,
         method: methodLabel,
-        transactionId: finalTrxId,
-        verified: isPaymentVerified,
+        transactionId: submitData.normalizedTrxId || savedOrder.transactionId || cleanTrxId,
+        verified: Boolean(submitData.verified),
+        flagged: Boolean(submitData.flagged),
+        flagMessage: submitData.flagMessage,
       });
 
-      try {
-        await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newOrder),
-        });
-        if (isCloudConnectedRef.current) {
-          await upsertStoreOrder(newOrder).catch(() => {});
-        }
-      } catch {
-        // ignore offline
-      } finally {
-        inFlightOrderIdsRef.current.delete(newOrder.id);
+      if (isCloudConnectedRef.current) {
+        void upsertStoreOrder(savedOrder).catch(() => {});
+        const normMethod: 'Nagad' | 'Rocket' | 'bKash' =
+          methodLabel.toLowerCase().includes('rocket')
+            ? 'Rocket'
+            : methodLabel.toLowerCase().includes('bkash')
+            ? 'bKash'
+            : 'Nagad';
+        void reserveUniqueTrxIdInFirestore({
+          trxId: submitData.normalizedTrxId || cleanTrxId,
+          method: normMethod,
+          orderId: savedOrder.id,
+          orderNumber: savedOrder.orderNumber,
+          userEmail: savedOrder.userEmail,
+          amountBdt: savedOrder.priceBdt,
+          status: submitData.flagged
+            ? 'flagged_mismatch'
+            : submitData.verified
+            ? 'verified_approved'
+            : 'reserved_pending',
+          usedAt: savedOrder.confirmedAt || savedOrder.createdAt,
+        }).catch(() => {});
       }
+
       void syncFromServer();
     } catch {
-      setPaymentError('Unable to verify payment right now. Please try again.');
+      setPaymentError(
+        'Unable to reach server payment verification right now. No payment can be approved without server verification.'
+      );
     } finally {
       setIsSubmittingOrder(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#090B0E] text-zinc-100 flex flex-col">
+    <div className="min-h-screen bg-[#0A090F] text-zinc-100 flex flex-col">
       {/* Top Bar Contract */}
-      <header className="sticky top-0 z-40 bg-[#090B0E]/90 backdrop-blur-md border-b border-white/[0.08]">
+      <header className="sticky top-0 z-40 bg-[#0A090F]/85 backdrop-blur-md border-b border-white/[0.06]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-8">
           <a
             href="#top"
-            className="inline-flex items-center gap-2 font-display text-base sm:text-lg font-bold tracking-tight text-zinc-100 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded"
+            className="inline-flex items-center gap-2 font-display text-base sm:text-lg font-bold italic tracking-tight text-white whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1] rounded"
           >
-            <RobuxMark className="w-5 h-5 text-amber-400 shrink-0" />
-            <span>RobuxOra</span>
+            <BrandShardLogo className="w-5 h-5 text-white shrink-0" />
+            <span>robuxora</span>
           </a>
 
           <nav
             aria-label="Primary navigation"
-            className="hidden md:flex items-center gap-7 text-sm font-medium text-zinc-400"
+            className="hidden md:flex items-center gap-7 text-xs sm:text-sm font-medium text-zinc-300"
           >
-            <a
-              href="#packages"
-              className="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+            <button
+              type="button"
+              onClick={() => setCurrentView('marketplace')}
+              className={`inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
+                currentView === 'marketplace' ? 'text-white font-semibold' : 'text-zinc-300 hover:text-white'
+              }`}
             >
-              Packages
-            </a>
+              <ShoppingBag className="w-3.5 h-3.5 text-violet-400 shrink-0" aria-hidden="true" />
+              <span>Marketplace</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentView('store')}
+              className={`inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
+                currentView === 'store' ? 'text-white font-semibold' : 'text-zinc-300 hover:text-white'
+              }`}
+            >
+              <RobuxMark className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>Robux Vault</span>
+            </button>
             <a
               href="#verification"
-              className="hover:text-zinc-100 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-2 hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Verification
+              <ShieldCheck className="w-3.5 h-3.5 text-violet-400 shrink-0" aria-hidden="true" />
+              <span>Group Verify</span>
             </a>
+            {session?.role === 'user' && (
+              <a
+                href="#my-orders"
+                className="inline-flex items-center gap-2 hover:text-white transition-colors whitespace-nowrap shrink-0"
+              >
+                <span>My Orders</span>
+              </a>
+            )}
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -2655,18 +2847,12 @@ export default function App() {
                   ? 'Switch to White Mode'
                   : 'Switch to Dark Mode'
               }
-              className="inline-flex h-9 w-9 sm:h-10 sm:w-auto sm:px-3 items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#131820] text-zinc-200 hover:border-amber-400/60 hover:text-zinc-100 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#171522] text-zinc-200 hover:border-[#764AF1]/60 hover:text-white transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1]"
             >
               {theme === 'dark' ? (
-                <>
-                  <Sun className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />
-                  <span className="hidden sm:inline text-xs font-medium">Light</span>
-                </>
+                <Sun className="w-4 h-4 text-violet-300 shrink-0" aria-hidden="true" />
               ) : (
-                <>
-                  <Moon className="w-4 h-4 text-zinc-200 shrink-0" aria-hidden="true" />
-                  <span className="hidden sm:inline text-xs font-medium">Dark</span>
-                </>
+                <Moon className="w-4 h-4 text-zinc-200 shrink-0" aria-hidden="true" />
               )}
             </button>
 
@@ -2674,7 +2860,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleOpenAuth('signin')}
-                className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-full bg-[#171522] border border-white/10 px-5 py-2 text-xs font-semibold text-zinc-100 hover:border-[#764AF1]/70 hover:bg-[#764AF1] hover:text-white transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#764AF1]"
               >
                 <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Sign In</span>
@@ -2685,7 +2871,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
-                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#131820] border border-white/15 px-3 py-2 text-xs font-semibold text-zinc-100 hover:border-amber-400/60 transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex min-h-[38px] items-center gap-2 rounded-full bg-[#171522] border border-white/10 px-3.5 py-1.5 text-xs font-semibold text-zinc-100 hover:border-[#764AF1]/70 transition-colors whitespace-nowrap shrink-0"
               >
                 {currentUser.avatar && !headerAvatarBroken ? (
                   <img
@@ -2693,15 +2879,15 @@ export default function App() {
                     src={currentUser.avatar}
                     alt={currentUser.name}
                     onError={() => setHeaderAvatarBroken(true)}
-                    className="w-5 h-5 rounded-full object-cover border border-amber-400/50 shrink-0"
+                    className="w-5 h-5 rounded-full object-cover border border-[#764AF1]/70 shrink-0"
                   />
                 ) : (
-                  <User className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
+                  <User className="w-3.5 h-3.5 text-violet-300 shrink-0" aria-hidden="true" />
                 )}
                 <span className="max-w-[110px] truncate">{currentUser.name}</span>
                 {currentUserTier.id !== 'starter' && (
                   <span
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${currentUserTier.borderClass} ${currentUserTier.bgClass} ${currentUserTier.textClass}`}
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${currentUserTier.borderClass} ${currentUserTier.bgClass} ${currentUserTier.textClass}`}
                   >
                     {currentUserTier.name}
                   </span>
@@ -2712,7 +2898,7 @@ export default function App() {
             {isAdmin && (
               <a
                 href="#admin-dashboard"
-                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-amber-400 px-3.5 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-[#764AF1] px-4 py-2 text-xs font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap shrink-0"
               >
                 <Shield className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Admin Panel</span>
@@ -2746,7 +2932,7 @@ export default function App() {
                 <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                   <a
                     href="#my-orders"
-                    className="inline-flex min-h-[34px] items-center justify-center rounded-lg bg-emerald-400 px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-emerald-300 transition-colors whitespace-nowrap"
+                    className="inline-flex min-h-[34px] items-center justify-center rounded-full bg-emerald-400 px-3.5 py-1 text-xs font-semibold text-zinc-950 hover:bg-emerald-300 transition-colors whitespace-nowrap"
                   >
                     View Order Status
                   </a>
@@ -2754,7 +2940,7 @@ export default function App() {
                     type="button"
                     aria-label="Dismiss confirmation banner"
                     onClick={() => setDismissedConfirmBannerKey(confirmedBannerKey)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-emerald-200/80 hover:bg-emerald-500/20 hover:text-white"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-emerald-200/80 hover:bg-emerald-500/20 hover:text-white"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -2771,6 +2957,8 @@ export default function App() {
               orders={orders}
               users={users}
               verifiedPayments={verifiedPayments}
+              paymentSecurityLogs={paymentSecurityLogs}
+              adminToken={adminToken}
               groupSettings={groupSettings}
               isCloudConnected={isCloudConnected}
               connectedCloudEmail={firebaseUser?.email || null}
@@ -2795,89 +2983,244 @@ export default function App() {
           </Suspense>
         )}
 
-        {/* 1. HERO SECTION */}
-        <section className="py-16 lg:py-20">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-stretch">
-              <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
-                <p className="text-xs font-medium tracking-wide text-amber-400">
-                  Velvet Visions Studio · Live API Verification
-                </p>
+        {/* MARKETPLACE VIEW OR STOREFRONT */}
+        {currentView === 'marketplace' ? (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8 animate-in fade-in duration-200">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+              <div>
+                <h1 className="font-display text-3xl font-bold text-white">Marketplace</h1>
+                <p className="text-sm text-zinc-400 mt-1">Browse thousands of premium items and currency packs.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <input
+                    type="text"
+                    value={marketSearch}
+                    onChange={(e) => setMarketSearch(e.target.value)}
+                    placeholder="Search marketplace..."
+                    className="w-full sm:w-64 rounded-xl bg-[#141019] border border-white/15 pl-10 pr-4 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#764AF1]"
+                  />
+                </div>
+                <div className="flex items-center gap-2 rounded-xl bg-[#141019] border border-white/15 px-3 py-2 text-xs font-medium text-zinc-300">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-violet-400" />
+                  <span>Sort: {marketSort}</span>
+                </div>
+              </div>
+            </div>
 
-                <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-zinc-100 leading-[1.08] text-balance">
-                  Verified Robux Packages Delivered via Group Funds
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Sidebar: Games */}
+              <div className="lg:col-span-3 rounded-2xl bg-[#110E15] border border-white/[0.09] p-5 space-y-3">
+                <h3 className="font-display text-sm font-semibold text-white uppercase tracking-wider mb-2">Games</h3>
+                <div className="space-y-1">
+                  {['All Games', 'BloxFruits', 'MM2', 'BloxFruit Physical Fruit', 'Rivals', "Gift Card's", 'Robux'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setMarketCategory(cat)}
+                      className={`w-full text-left rounded-xl px-3.5 py-2.5 text-xs font-medium transition-colors flex items-center justify-between ${
+                        marketCategory === cat
+                          ? 'bg-[#764AF1] text-white font-semibold'
+                          : 'text-zinc-300 hover:bg-white/[0.06] hover:text-white'
+                      }`}
+                    >
+                      <span>{cat}</span>
+                      <span className="text-[10px] opacity-75 font-mono">
+                        {cat === 'All Games'
+                          ? packages.length
+                          : packages.filter((p) => (p.category || 'Robux').toLowerCase() === cat.toLowerCase()).length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Main Item Grid */}
+              <div className="lg:col-span-9 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {packages
+                    .filter((pkg) => {
+                      if (marketCategory !== 'All Games') {
+                        const pkgCat = (pkg.category || 'Robux').toLowerCase();
+                        const selCat = marketCategory.toLowerCase();
+                        if (pkgCat !== selCat) return false;
+                      }
+                      if (marketSearch.trim()) {
+                        const q = marketSearch.trim().toLowerCase();
+                        return pkg.title.toLowerCase().includes(q) || pkg.deliveryNote.toLowerCase().includes(q);
+                      }
+                      return true;
+                    })
+                    .map((pkg) => {
+                      const cleanImg = sanitizeImage(pkg.image);
+                      const hasDiscount = typeof pkg.originalPriceBdt === 'number' && pkg.originalPriceBdt > pkg.priceBdt;
+                      return (
+                        <div
+                          key={pkg.id}
+                          className="rounded-2xl bg-[#130F1A] border border-white/[0.09] hover:border-[#764AF1]/50 p-4 flex flex-col justify-between space-y-4 transition-all duration-200 hover:-translate-y-1 shadow-xl group"
+                        >
+                          <div className="relative aspect-square rounded-xl bg-[#09070B] border border-white/[0.08] overflow-hidden flex items-center justify-center p-4">
+                            <span className="absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1 rounded-full bg-violet-500/20 border border-violet-500/40 px-2.5 py-0.5 text-[10px] font-bold text-violet-300 uppercase">
+                              {pkg.category || 'Robux'}
+                            </span>
+                            <span className="absolute top-2.5 right-2.5 z-10 inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 uppercase">
+                              SALE
+                            </span>
+                            {cleanImg ? (
+                              <img
+                                src={cleanImg}
+                                alt={pkg.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 rounded-lg"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-center space-y-2">
+                                <RobuxMark className="w-12 h-12 text-[#764AF1]" />
+                                <span className="text-xs font-mono text-zinc-400">{pkg.tierLabel}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="font-display font-semibold text-sm text-zinc-100">{pkg.title}</div>
+                            <div className="text-[11px] text-zinc-400">{pkg.deliveryNote}</div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-white/[0.07]">
+                            <div>
+                              {hasDiscount && (
+                                <div className="text-[11px] text-zinc-500 line-through font-mono">
+                                  ৳{pkg.originalPriceBdt} BDT
+                                </div>
+                              )}
+                              <div className="font-mono font-bold text-sm text-[#E6C7DC]">
+                                ৳{pkg.priceBdt} BDT
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPackageId(pkg.id);
+                                setCurrentView('store');
+                                const el = document.getElementById('packages');
+                                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-[#764AF1] hover:bg-[#855DF7] px-4 py-1.5 text-xs font-semibold text-white transition-colors"
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Buy Now</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-0">
+        {/* 1. CURVED COSMIC HERO SECTION */}
+        <section className="hero-cosmic-canvas relative overflow-hidden pt-12 pb-20 sm:pt-16 sm:pb-24">
+          <div className="max-w-6xl mx-auto px-6 relative z-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+              <div className="lg:col-span-6 flex flex-col justify-center space-y-6">
+                <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.35rem] font-bold tracking-tight text-white leading-[1.1] text-balance">
+                  Meet the <span className="italic font-semibold text-[#8B5CF6]">best</span> Robux marketplace in Roblox
                 </h1>
 
-                <p className="text-base text-zinc-400 leading-relaxed max-w-xl">
-                  Select a Robux package, join our official Roblox community, and verify your username via the Roblox Public API to activate your 15-day security countdown.
+                <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-md">
+                  Unforgettable experience of verified Group Payouts, real-time Roblox API checks, and automatic 15-day security holds — with zero account password needed.
                 </p>
 
-                <div className="flex flex-wrap items-center gap-4 pt-1">
+                <div className="flex flex-wrap items-center gap-6 pt-1">
                   <a
                     href="#packages"
-                    className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    className="inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-full bg-[#764AF1] px-7 py-3 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]"
                   >
-                    <span>Browse Packages</span>
-                    <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    <span>Visit Market</span>
+                    <ChevronRight className="w-4 h-4 shrink-0" aria-hidden="true" />
                   </a>
 
                   <a
                     href="#verification"
-                    className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#131820] px-5 py-3 text-sm font-medium text-zinc-200 hover:border-white/25 hover:text-white transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-zinc-200 hover:text-white transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] rounded px-1"
                   >
-                    <span>Verify Membership</span>
-                    <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    Learn more
                   </a>
                 </div>
 
                 <div className="pt-4 border-t border-white/[0.08] flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-                  <span>Real-Time Roblox API Check</span>
+                  <span>Velvet Visions Studio</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Live Roblox API Verification</span>
                   <span aria-hidden="true">·</span>
                   <span>15-Day Security Hold</span>
-                  <span aria-hidden="true">·</span>
-                  <span>Zero Password Required</span>
                 </div>
               </div>
 
-              <div className="lg:col-span-6">
-                <div className="relative h-full min-h-[280px] sm:min-h-[340px] rounded-xl overflow-hidden border border-white/[0.08] bg-[#131820]">
+              <div className="lg:col-span-6 relative flex items-center justify-center min-h-[300px] sm:min-h-[380px]">
+                {/* Geometric angled diamond outline & violet triangle accent behind character */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute w-64 h-64 sm:w-80 sm:h-80 rotate-45 rounded-2xl border border-[#764AF1]/25 bg-gradient-to-br from-[#764AF1]/15 via-transparent to-transparent"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-10 sm:right-16 top-16 w-44 h-44 sm:w-56 sm:h-56 rotate-45 rounded-xl bg-gradient-to-tr from-[#6D28D9]/45 to-[#8B5CF6]/70 blur-[1px]"
+                />
+                <div className="relative z-10 w-64 sm:w-80 aspect-[3/4] flex items-end justify-center">
                   <ResilientImage
-                    src="/src/assets/images/hero_robux_vault_1794846839199.jpg"
-                    alt="Stacked brushed gold hexagonal Robux tokens on dark slate"
-                    title="RobuxOra Robux Vault"
-                    className="w-full h-full lg:h-full object-cover"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090B0E]/70 via-transparent to-transparent"
+                    src="/src/assets/images/hero_roblox_character_1795779452167.jpg"
+                    alt="Stylized Roblox avatar steampunk character in violet vault lighting"
+                    title="RobuxOra Verified Vault"
+                    className="w-full h-full object-cover rounded-3xl [mask-image:radial-gradient(ellipse_at_center,black_62%,transparent_100%)]"
                   />
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Sweeping Curved Horizon Divider */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 overflow-hidden leading-none"
+          >
+            <svg
+              viewBox="0 0 1440 84"
+              preserveAspectRatio="none"
+              className="w-full h-10 sm:h-16 block"
+            >
+              <path
+                d="M0,12 Q720,96 1440,12 L1440,84 L0,84 Z"
+                fill={theme === 'light' ? '#f8f9fc' : '#0A090F'}
+              />
+              <path
+                d="M0,12 Q720,96 1440,12"
+                fill="none"
+                stroke="rgba(139, 92, 246, 0.38)"
+                strokeWidth="1.5"
+              />
+            </svg>
+          </div>
         </section>
 
-        {/* 2. SHOP / ROBUX PACKAGES SECTION */}
+        {/* 2. TRENDING NOW / ROBUX PACKAGES SECTION */}
         <section
           id="packages"
-          className="py-20 border-t border-white/[0.08]"
+          className="pt-8 pb-20"
           aria-labelledby="packages-heading"
         >
-          <div className="max-w-6xl mx-auto px-6 space-y-10">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium tracking-wide text-amber-400 mb-2">
-                  Robux Storefront
-                </p>
-                <h2
-                  id="packages-heading"
-                  className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-zinc-100"
-                >
-                  Select a Robux Package
-                </h2>
-              </div>
-              <p className="text-sm text-zinc-400 max-w-md">
-                Click Buy Now on any package to verify your Roblox username against our community group in real time.
+          <div className="max-w-6xl mx-auto px-6 space-y-12">
+            <div className="text-center max-w-md mx-auto space-y-2.5">
+              <h2
+                id="packages-heading"
+                className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white"
+              >
+                Trending Now
+              </h2>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Packages gaining popularity right now. Most users select a vault pack to activate their instant group verification.
               </p>
             </div>
 
@@ -2889,106 +3232,68 @@ export default function App() {
             )}
 
             {packages.length === 0 ? (
-              <div className="rounded-xl bg-[#131820] border border-white/[0.08] p-10 text-center text-sm text-zinc-400">
+              <div className="rounded-2xl bg-[#110F1B] border border-white/[0.06] p-10 text-center text-sm text-zinc-400">
                 No Robux packages are currently listed. Sign in as Admin to add new packages.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {packages.map((pkg, idx) => {
                   const isSelected = selectedPackage?.id === pkg.id;
-                  const hasCustomImage = Boolean(
-                    pkg.image && !pkg.image.startsWith('/src/assets/images/pkg_')
-                  );
-                  const originalPrice = Math.round(pkg.priceBdt * 1.25);
-                  const saveAmount = originalPrice - pkg.priceBdt;
+                  const displayArtwork = pkg.image?.trim() || DEFAULT_PRODUCT_IMAGE;
                   return (
                     <article
                       key={pkg.id}
-                      className={`group relative flex flex-col rounded-2xl overflow-hidden bg-[#131820] border transition-all duration-200 hover:-translate-y-1 ${
+                      className={`group relative flex flex-col rounded-2xl bg-[#110F1B] border p-5 transition-all duration-200 ${
                         isSelected
-                          ? 'border-amber-400/80 shadow-lg shadow-amber-400/10'
-                          : 'border-white/[0.08] hover:border-purple-500/40 hover:shadow-xl hover:shadow-purple-500/5'
+                          ? 'border-[#764AF1]/80 shadow-xl shadow-[#764AF1]/15'
+                          : 'border-white/[0.06] hover:border-[#764AF1]/45'
                       }`}
                     >
-                      {/* Top Absolute Badges (Save & Hot) */}
-                      <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 text-white px-2.5 py-0.5 text-xs font-bold shadow-md backdrop-blur">
-                          Save ৳{saveAmount}
-                        </span>
-                        {idx === 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-zinc-950 px-2.5 py-0.5 text-xs font-extrabold shadow-md">
-                            🔥 Hot
-                          </span>
-                        )}
+                      {/* Clean Centered Header Row */}
+                      <div className="flex items-center justify-center gap-2 pb-4 text-sm font-semibold text-zinc-100">
+                        <RobuxMark className="w-4 h-4 text-[#8B5CF6] shrink-0" />
+                        <span>{pkg.tierLabel || 'Robux Vault'}</span>
                       </div>
 
-                      {/* Package Image Area */}
-                      <div className="aspect-[4/3] w-full overflow-hidden bg-[#0D1117] border-b border-white/[0.06] relative flex items-center justify-center">
-                        {hasCustomImage ? (
+                      {/* Inner Item Showcase Box */}
+                      <div className="rounded-xl bg-[#161422] border border-white/[0.05] p-3.5 flex flex-col justify-between flex-1">
+                        <div className="aspect-square w-full overflow-hidden rounded-lg bg-[#12101B] flex items-center justify-center mb-3.5">
                           <ResilientImage
-                            src={pkg.image}
-                            alt={`${pkg.title} product image`}
+                            src={displayArtwork}
+                            alt={`${pkg.title} vault bundle`}
                             title={pkg.title}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
-                        ) : (
-                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-purple-600/15 to-zinc-900 flex flex-col items-center justify-center p-4">
-                            <RobuxMark className="w-16 h-16 text-amber-400 drop-shadow-lg mb-2" />
-                            <span className="font-display font-bold text-lg text-zinc-100">{pkg.title}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-5 flex-1 flex flex-col justify-between space-y-5">
-                        <div className="space-y-2.5">
-                          {/* Pill Category Badge */}
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/[0.06] border border-white/10 text-zinc-300">
-                              {pkg.tierLabel || 'TopUp'}
-                            </span>
-                            <span className="text-xs text-zinc-500">·</span>
-                            <span className="text-xs text-emerald-400 font-medium">{pkg.deliveryNote || 'Automated'}</span>
-                          </div>
-
-                          <h3 className="font-display text-xl font-bold text-zinc-100 flex items-center gap-2">
-                            <span className="tabular-nums">{pkg.title}</span>
-                          </h3>
-
-                          {/* Star Rating */}
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <div className="flex text-amber-400">
-                              {'★★★★★'.split('').map((s, i) => (
-                                <span key={i} className="text-sm">{s}</span>
-                              ))}
-                            </div>
-                            <span className="font-bold text-zinc-200">4.9</span>
-                            <span className="text-zinc-500">(48)</span>
-                          </div>
-
-                          {/* Pricing block */}
-                          <div className="pt-2 border-t border-white/[0.06] flex items-baseline justify-between gap-2">
-                            <div>
-                              <div className="text-[11px] text-zinc-400">Starting from</div>
-                              <div className="font-mono text-xl font-extrabold text-zinc-100 tabular-nums">
-                                ৳{pkg.priceBdt}.00
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-mono text-xs text-zinc-500 line-through tabular-nums">
-                                ৳{originalPrice}.00
-                              </div>
-                            </div>
-                          </div>
                         </div>
 
-                        {/* Purple Action Button */}
+                        <div className="space-y-1">
+                          <h3 className="font-display text-base font-semibold text-zinc-100 truncate">
+                            {pkg.title}
+                          </h3>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="font-mono font-bold text-zinc-100 tabular-nums">
+                              ৳{pkg.priceBdt}.00
+                            </span>
+                            <span className="text-zinc-400 truncate">
+                              {pkg.deliveryNote || 'Group Payout'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Centered Rounded Pill Action */}
+                      <div className="pt-5 flex justify-center">
                         <button
                           type="button"
                           onClick={() => handleBuyNow(pkg)}
-                          className="w-full min-h-[44px] rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-purple-500 transition-colors shadow-lg shadow-purple-600/25 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 flex items-center justify-center gap-2"
+                          className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-full px-6 py-2 text-xs font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] ${
+                            isSelected
+                              ? 'bg-[#764AF1] text-white border border-[#8B5CF6]'
+                              : 'bg-[#181524] border border-white/[0.08] text-zinc-200 hover:bg-[#764AF1] hover:border-[#764AF1] hover:text-white'
+                          }`}
                         >
-                          <span>অপশন বেছে নিন</span>
-                          <span className="text-xs opacity-80">(Select Option)</span>
+                          <span>Visit Market</span>
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         </button>
                       </div>
                     </article>
@@ -2999,83 +3304,194 @@ export default function App() {
           </div>
         </section>
 
-        {/* Robux Available Stock Bar */}
+        {/* 3. BUY ROBUX INSTANTLY PROMOTIONAL BANNER + LIVE STOCK STATUS */}
         {(() => {
           const liveAvailable = groupSettings?.availableRobux ?? 25400;
           const isOutOfStock = liveAvailable <= 0;
+          const primaryPkg = selectedPackage || packages[0] || null;
           return (
-            <div className="max-w-6xl mx-auto px-6 pt-10 pb-2">
-              <div
-                className={`rounded-xl bg-[#131820] border p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl transition-all duration-500 ${
-                  isOutOfStock
-                    ? 'border-red-500/50 bg-red-500/[0.06] shadow-red-500/15 stock-alert-red'
-                    : 'border-emerald-500/30 shadow-emerald-500/5'
-                }`}
-              >
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className={`flex h-11 w-11 items-center justify-center rounded-xl border shrink-0 transition-colors duration-500 ${
-                      isOutOfStock
-                        ? 'bg-red-500/15 text-red-400 border-red-500/40'
-                        : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                    }`}
-                  >
-                    {isOutOfStock ? (
-                      <AlertTriangle className="w-5 h-5 animate-pulse" aria-hidden="true" />
-                    ) : (
-                      <Shield className="w-5 h-5" aria-hidden="true" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2.5">
-                      <span className="relative flex h-2.5 w-2.5 shrink-0">
-                        <span
-                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                            isOutOfStock ? 'bg-red-400' : 'bg-emerald-400'
-                          }`}
-                        />
-                        <span
-                          className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                            isOutOfStock ? 'bg-red-500' : 'bg-emerald-400'
-                          }`}
-                        />
-                      </span>
-                      <span
-                        className={`font-display font-bold text-xl sm:text-2xl tabular-nums transition-colors duration-500 ${
-                          isOutOfStock ? 'text-red-400' : 'text-zinc-100'
-                        }`}
-                      >
-                        {liveAvailable.toLocaleString()} Robux Available
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {isOutOfStock
-                        ? 'Robux stock is currently empty (0 available). Please wait for restock before placing an order.'
-                        : 'Official community group funds ready for instant transfer · 15-hour delivery window.'}
-                    </p>
-                  </div>
-                </div>
+            <section className="py-10">
+              <div className="max-w-6xl mx-auto px-6 space-y-4">
                 <div
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap transition-all duration-500 ${
+                  className={`relative rounded-3xl bg-gradient-to-r from-[#110F1B] via-[#141120] to-[#1A1626] border overflow-hidden ${
                     isOutOfStock
-                      ? 'bg-red-500/15 border-red-500/40 text-red-300 animate-pulse'
-                      : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                      ? 'border-red-500/45 stock-alert-red'
+                      : 'border-white/[0.06]'
                   }`}
                 >
-                  {isOutOfStock ? '🔴 Out of Stock' : '🟢 Live Stock Active'}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
+                    <div className="lg:col-span-7 p-7 sm:p-11 space-y-5 relative z-10">
+                      <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white leading-tight max-w-md text-balance">
+                        Buy Robux instantly. Without any limits.
+                      </h2>
+                      <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
+                        RobuxOra provides verified Robux group-fund delivery directly through our official Roblox community with live stock checks.
+                      </p>
+
+                      {/* Clean Real-Time Stock Status Line */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <span
+                          className={`font-mono font-semibold tabular-nums ${
+                            isOutOfStock ? 'text-red-400' : 'text-emerald-400'
+                          }`}
+                        >
+                          {liveAvailable.toLocaleString()} Robux Available
+                        </span>
+                        <span className="text-zinc-600" aria-hidden="true">·</span>
+                        <span className="text-zinc-400">
+                          {isOutOfStock
+                            ? 'Out of Stock — Waiting for Admin Restock'
+                            : 'Official Group Funds Active'}
+                        </span>
+                      </div>
+
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (primaryPkg) {
+                              handleBuyNow(primaryPkg);
+                            } else {
+                              document
+                                .getElementById('packages')
+                                ?.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[#1C1928] border border-white/10 px-6 py-2.5 text-xs font-semibold text-white hover:bg-[#764AF1] hover:border-[#764AF1] transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]"
+                        >
+                          <span>Buy Robux</span>
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="lg:col-span-5 relative h-56 sm:h-72 lg:h-full min-h-[240px] flex items-center justify-end overflow-hidden">
+                      <ResilientImage
+                        src="/src/assets/images/promo_gold_robux_1795779452895.jpg"
+                        alt="Gold hexagonal Robux emblem"
+                        title="Instant Robux Vault"
+                        className="w-full h-full object-cover object-center [mask-image:linear-gradient(to_left,black_55%,transparent_100%)]"
+                      />
+
+                      {/* Floating Payout Proof Tags matching reference mockup */}
+                      <div className="pointer-events-none absolute bottom-6 left-4 sm:left-8 rounded-full bg-[#181523]/90 backdrop-blur-md border border-white/10 px-3.5 py-2 flex items-center gap-2.5 shadow-xl">
+                        <div className="w-7 h-7 rounded-full bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0">
+                          <RobuxMark className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="leading-tight">
+                          <div className="font-mono text-xs font-bold text-white tabular-nums">
+                            +{(primaryPkg?.robux ?? 1700).toLocaleString()} R$
+                          </div>
+                          <div className="text-[10px] text-zinc-400">
+                            {isOutOfStock ? 'Restock pending' : 'Group funds ready'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {isOutOfStock && (
-                <div className="mt-4">
+
+                {isOutOfStock && (
                   <RestockCountdownCard
                     availableRobux={liveAvailable}
                     restockTimestamp={groupSettings?.restockTimestamp}
                   />
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </section>
           );
         })()}
+
+        {/* 4. LIVE FEED SECTION */}
+        <section id="live-feed" className="py-16" aria-labelledby="live-feed-heading">
+          <div className="max-w-6xl mx-auto px-6 space-y-10">
+            <div className="text-center max-w-md mx-auto space-y-2.5">
+              <h2
+                id="live-feed-heading"
+                className="font-display text-3xl font-bold tracking-tight text-white"
+              >
+                Live Feed
+              </h2>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Here you can view real-time statistics and data on the latest transactions on our platform
+              </p>
+            </div>
+
+            {(() => {
+              const recentOrders = orders
+                .filter((o) => normalizeOrderStatus(o.status) !== 'Cancelled')
+                .slice(0, 4);
+              if (recentOrders.length > 0) {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {recentOrders.map((order, idx) => (
+                      <div
+                        key={order.id}
+                        className="rounded-2xl bg-[#110F1B] border border-white/[0.06] p-4 flex items-center gap-3.5 hover:border-[#764AF1]/40 transition-colors"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-[#161422] border border-white/[0.06] overflow-hidden shrink-0">
+                          <ResilientImage
+                            src={VAULT_ARTWORKS[idx % VAULT_ARTWORKS.length]}
+                            alt={order.packageTitle}
+                            title={order.packageTitle}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-zinc-100 truncate">
+                            {order.packageTitle}
+                          </div>
+                          <div className="flex items-center justify-between gap-2 mt-1 text-xs">
+                            <span className="font-mono font-semibold text-zinc-300 tabular-nums">
+                              ৳{order.priceBdt}.00
+                            </span>
+                            <span className="text-[11px] text-zinc-500 whitespace-nowrap">
+                              {formatRelativeAgo(order.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {packages.slice(0, 4).map((pkg, idx) => (
+                    <button
+                      key={pkg.id}
+                      type="button"
+                      onClick={() => handleBuyNow(pkg)}
+                      className="text-left rounded-2xl bg-[#110F1B] border border-white/[0.06] p-4 flex items-center gap-3.5 hover:border-[#764AF1]/50 transition-colors"
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-[#161422] border border-white/[0.06] overflow-hidden shrink-0">
+                        <ResilientImage
+                          src={pkg.image?.trim() || DEFAULT_PRODUCT_IMAGE}
+                          alt={pkg.title}
+                          title={pkg.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-zinc-100 truncate">
+                          {pkg.title}
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1 text-xs">
+                          <span className="font-mono font-semibold text-zinc-300 tabular-nums">
+                            ৳{pkg.priceBdt}.00
+                          </span>
+                          <span className="text-[11px] text-emerald-400 whitespace-nowrap">
+                            Available
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </section>
 
         {/* 3. ON-PAGE VERIFICATION, 15-DAY TIMER & PAYMENT SECTION */}
         <VerificationAndPaymentSection
@@ -3121,7 +3537,7 @@ export default function App() {
               packageTitle: selectedPackage.title,
             });
           }}
-          onCompleteOrder={(trxId) => void handleCompleteOrder(trxId)}
+          onCompleteOrder={(trxId, senderPhone) => void handleCompleteOrder(trxId, senderPhone)}
         />
 
         {/* LIVE CUSTOMER ORDER STATUS & CONFIRMATION TRACKER */}
@@ -3133,30 +3549,30 @@ export default function App() {
           />
         )}
 
-        {/* 4. FAQ SECTION */}
+        {/* 5. FAQ SECTION */}
         <section
           id="faq"
-          className="py-20 border-t border-white/[0.08]"
+          className="py-16 border-t border-white/[0.06]"
           aria-labelledby="faq-heading"
         >
           <div className="max-w-6xl mx-auto px-6 space-y-10">
-            <div className="max-w-xl">
-              <p className="text-xs font-medium tracking-wide text-amber-400 mb-2">
-                Payout Policy
-              </p>
+            <div className="text-center max-w-md mx-auto space-y-2">
               <h2
                 id="faq-heading"
-                className="font-display text-3xl font-bold tracking-tight text-zinc-100"
+                className="font-display text-3xl font-bold tracking-tight text-white"
               >
                 Frequently Asked Questions
               </h2>
+              <p className="text-xs text-zinc-400">
+                Payout policy, live group verification, and 15-day hold details
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {FAQ_ITEMS.map((item, idx) => (
                 <div
                   key={item.q}
-                  className="rounded-xl bg-[#131820] border border-white/[0.08] p-6 space-y-3"
+                  className="rounded-2xl bg-[#110F1B] border border-white/[0.06] p-6 space-y-3"
                 >
                   <h3 className="font-display text-base font-semibold text-zinc-100 leading-snug">
                     0{idx + 1}. {item.q}
@@ -3169,14 +3585,17 @@ export default function App() {
             </div>
           </div>
         </section>
+          </div>
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.08] py-10 bg-[#090B0E]">
+      <footer className="border-t border-white/[0.06] py-10 bg-[#0A090F]">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-zinc-500">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-display font-semibold text-zinc-300">
-              RobuxOra
+          <div className="flex flex-wrap items-center gap-2.5">
+            <BrandShardLogo className="w-4 h-4 text-zinc-300 shrink-0" />
+            <span className="font-display font-bold italic text-zinc-200">
+              robuxora
             </span>
             <span aria-hidden="true">·</span>
             <span>Velvet Visions Studio Community Storefront</span>
@@ -3185,21 +3604,21 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-6">
             <a
               href="#packages"
-              className="hover:text-zinc-300 transition-colors whitespace-nowrap"
+              className="hover:text-zinc-200 transition-colors whitespace-nowrap"
             >
-              Packages
+              Robux Vault
             </a>
             <a
               href="#verification"
-              className="hover:text-zinc-300 transition-colors whitespace-nowrap"
+              className="hover:text-zinc-200 transition-colors whitespace-nowrap"
             >
-              Verification
+              Group Verify
             </a>
             <a
-              href="#payment"
-              className="hover:text-zinc-300 transition-colors whitespace-nowrap"
+              href="#live-feed"
+              className="hover:text-zinc-200 transition-colors whitespace-nowrap"
             >
-              Payment
+              Live Feed
             </a>
           </div>
         </div>
@@ -3251,7 +3670,7 @@ export default function App() {
                 packageTitle: selectedPackage.title,
               });
             }}
-            onSubmitOrder={(trxId) => void handleCompleteOrder(trxId)}
+            onSubmitOrder={(trxId, senderPhone) => void handleCompleteOrder(trxId, senderPhone)}
           />
         </Suspense>
       )}
@@ -3298,11 +3717,11 @@ export default function App() {
           aria-modal="true"
           aria-labelledby="out-of-stock-popup-title"
           onClick={() => setOutOfStockAlert(null)}
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-xl bg-[#131820] border border-red-500/50 p-6 shadow-2xl space-y-4 stock-alert-red"
+            className="w-full max-w-sm rounded-2xl bg-[#110F1B] border border-red-500/50 p-6 shadow-2xl space-y-4 stock-alert-red"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -3353,6 +3772,63 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Need Help? Floating Button & Support Popup */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {isHelpMenuOpen && (
+          <div className="absolute bottom-16 right-0 w-64 rounded-2xl bg-[#17131D] border border-white/15 p-3.5 shadow-2xl space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <span className="text-xs font-semibold text-white">Need Help &amp; Support?</span>
+              <button
+                type="button"
+                aria-label="Close help menu"
+                onClick={() => setIsHelpMenuOpen(false)}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <a
+              href="https://t.me/01764088123"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setIsHelpMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] p-2.5 text-xs font-medium text-zinc-200 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 font-bold shrink-0">
+                TG
+              </div>
+              <div>
+                <div className="text-white font-semibold">Telegram Support</div>
+                <div className="text-[11px] text-zinc-400 font-mono">01764088123</div>
+              </div>
+            </a>
+            <a
+              href="https://instagram.com/robuxora"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setIsHelpMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] p-2.5 text-xs font-medium text-zinc-200 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/40 flex items-center justify-center text-fuchsia-400 font-bold shrink-0">
+                IG
+              </div>
+              <div>
+                <div className="text-white font-semibold">Instagram Profile</div>
+                <div className="text-[11px] text-zinc-400 font-mono">@robuxora</div>
+              </div>
+            </a>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setIsHelpMenuOpen((prev) => !prev)}
+          className="inline-flex items-center gap-2 rounded-full bg-[#D946EF] hover:bg-[#C026D3] text-white px-5 py-3 text-sm font-semibold shadow-2xl hover:scale-105 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <Headphones className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>Need Help?</span>
+        </button>
+      </div>
     </div>
   );
 }

@@ -10,7 +10,7 @@
   html {
     scroll-behavior: smooth;
     font-family: var(--font-sans);
-    background-color: #090b0e;
+    background-color: #0a090f;
     color: #f4f4f5;
   }
 
@@ -26,6 +26,15 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* Cosmic Hero Backdrop (Main Storefront Only) */
+.hero-cosmic-canvas {
+  background:
+    radial-gradient(ellipse 72% 55% at 22% 18%, rgba(118, 74, 241, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 60% at 78% 68%, rgba(124, 58, 237, 0.24) 0%, transparent 68%),
+    radial-gradient(ellipse 110% 70% at 50% 100%, rgba(109, 40, 217, 0.22) 0%, transparent 72%),
+    linear-gradient(180deg, #07060b 0%, #0b0914 60%, #140f26 100%);
 }
 
 /* Universal Button & Link Interactive Architecture */
@@ -54,7 +63,7 @@ input[type="button"],
   input[type="submit"]:hover,
   input[type="button"]:hover,
   [role="button"]:hover {
-    transform: translateY(-2.5px) scale(1.02);
+    transform: translateY(-2px) scale(1.015);
   }
 }
 
@@ -64,11 +73,32 @@ a[href]:active,
 input[type="submit"]:active,
 input[type="button"]:active,
 [role="button"]:active {
-  transform: translateY(1.5px) scale(0.94) !important;
+  transform: translateY(1.5px) scale(0.95) !important;
   transition-duration: 60ms !important;
 }
 
-/* Ambient Breathing Aura on primary amber action buttons */
+/* Subtle Violet Aura on primary storefront CTA buttons */
+@keyframes btnVioletAura {
+  0%, 100% {
+    box-shadow: 0 6px 20px -4px rgba(118, 74, 241, 0.5);
+  }
+  50% {
+    box-shadow: 0 8px 26px -2px rgba(139, 92, 246, 0.65), 0 0 16px 1px rgba(118, 74, 241, 0.35);
+  }
+}
+
+button.bg-\[\#764AF1\]:not(:disabled),
+a.bg-\[\#764AF1\] {
+  animation: btnVioletAura 3.2s ease-in-out infinite;
+}
+
+button.bg-\[\#764AF1\]:not(:disabled):hover,
+a.bg-\[\#764AF1\]:hover {
+  box-shadow: 0 0 28px -2px rgba(139, 92, 246, 0.78), 0 10px 28px -4px rgba(0, 0, 0, 0.55);
+  filter: brightness(1.06);
+}
+
+/* Ambient Breathing Aura on primary amber action buttons (used inside AdminDashboard) */
 @keyframes btnAmberAura {
   0%, 100% {
     box-shadow: 0 4px 14px -3px rgba(251, 191, 36, 0.45);
@@ -91,7 +121,7 @@ button.bg-amber-300:not(:disabled):hover {
   filter: brightness(1.05);
 }
 
-/* Shimmer Ribbon on primary amber action buttons */
+/* Shimmer Ribbon on primary action buttons */
 button.bg-amber-400:not(:disabled)::after,
 a.bg-amber-400::after,
 button.btn-shimmer::after {
@@ -146,13 +176,13 @@ button.btn-shimmer:hover::after {
 /* Color-Coded Exterior Shockwave Radiations (never clipped by overflow:hidden) */
 @keyframes btnShockwaveAmber {
   0% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.75), 0 0 18px rgba(251, 191, 36, 0.55);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.75), 0 0 18px rgba(139, 92, 246, 0.55);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.35), 0 0 26px rgba(251, 191, 36, 0.35);
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0.35), 0 0 26px rgba(139, 92, 246, 0.35);
   }
   100% {
-    box-shadow: 0 0 0 16px rgba(251, 191, 36, 0), 0 0 32px rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 16px rgba(139, 92, 246, 0), 0 0 32px rgba(139, 92, 246, 0);
   }
 }
 
@@ -216,7 +246,7 @@ button.btn-shimmer:hover::after {
 .btn-dynamic-ripple {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.65) 0%, rgba(251, 191, 36, 0.45) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.65) 0%, rgba(139, 92, 246, 0.45) 45%, transparent 70%);
   transform: scale(0);
   animation: dynamicRippleAnim 560ms cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
   pointer-events: none;
@@ -241,8 +271,10 @@ a[href] svg {
 }
 
 button:hover svg.lucide-arrow-right,
-a[href]:hover svg.lucide-arrow-right {
-  transform: translateX(5px);
+a[href]:hover svg.lucide-arrow-right,
+button:hover svg.lucide-chevron-right,
+a[href]:hover svg.lucide-chevron-right {
+  transform: translateX(4px);
 }
 
 button:hover svg.lucide-chevron-down,
@@ -278,14 +310,14 @@ button:active svg.lucide-refresh-cw {
 
 button:hover svg.lucide-zap {
   animation: zapVibrate 450ms ease-in-out infinite;
-  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.8));
+  filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.8));
 }
 
 button:hover svg.lucide-shield,
 button:hover svg.lucide-shield-check,
 a:hover svg.lucide-shield {
   transform: scale(1.18);
-  filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.6));
+  filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.6));
 }
 
 button:hover svg.lucide-camera,
@@ -337,14 +369,9 @@ button:hover svg.lucide-log-out {
 }
 
 #packages article:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 18px 40px -8px rgba(0, 0, 0, 0.6), 0 0 24px -2px rgba(251, 191, 36, 0.2);
-  border-color: rgba(251, 191, 36, 0.55);
-}
-
-#packages article:hover button {
-  box-shadow: 0 0 20px -2px rgba(251, 191, 36, 0.7);
-  filter: brightness(1.05);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 44px -10px rgba(0, 0, 0, 0.7), 0 0 28px -4px rgba(118, 74, 241, 0.25);
+  border-color: rgba(118, 74, 241, 0.45);
 }
 
 @keyframes outOfStockRedPulse {
@@ -365,34 +392,60 @@ button:hover svg.lucide-log-out {
 /* Light / White Mode Overrides */
 html.theme-light,
 html.theme-light body {
-  background-color: #ffffff;
+  background-color: #f8f9fc;
   color: #0f172a;
   color-scheme: light;
 }
 
-html.theme-light .bg-\[\#090B0E\] {
-  background-color: #ffffff;
+html.theme-light .hero-cosmic-canvas {
+  background:
+    radial-gradient(ellipse 72% 55% at 22% 18%, rgba(118, 74, 241, 0.12) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 60% at 78% 68%, rgba(124, 58, 237, 0.15) 0%, transparent 68%),
+    linear-gradient(180deg, #f3f1fc 0%, #ffffff 100%);
+}
+
+html.theme-light .hero-cosmic-canvas h1,
+html.theme-light .hero-cosmic-canvas .text-white {
+  color: #0f172a;
+}
+
+html.theme-light .bg-\[\#090B0E\],
+html.theme-light .bg-\[\#0A090F\] {
+  background-color: #f8f9fc;
 }
 
 html.theme-light input.bg-\[\#090B0E\],
 html.theme-light select.bg-\[\#090B0E\],
 html.theme-light textarea.bg-\[\#090B0E\],
+html.theme-light input.bg-\[\#0A090F\],
+html.theme-light select.bg-\[\#0A090F\],
+html.theme-light textarea.bg-\[\#0A090F\],
 html.theme-light .bg-\[\#131820\] .bg-\[\#090B0E\],
+html.theme-light .bg-\[\#110F1B\] .bg-\[\#0A090F\],
 html.theme-light .bg-\[\#0D1117\] .bg-\[\#090B0E\] {
-  background-color: #f8fafc;
+  background-color: #f1f5f9;
 }
 
-html.theme-light .bg-\[\#090B0E\]\/90 {
+html.theme-light .bg-\[\#090B0E\]\/90,
+html.theme-light .bg-\[\#0A090F\]\/90,
+html.theme-light .bg-\[\#0A090F\]\/85 {
   background-color: rgba(255, 255, 255, 0.92);
 }
 
-html.theme-light .bg-\[\#131820\] {
+html.theme-light .bg-\[\#131820\],
+html.theme-light .bg-\[\#110F1B\],
+html.theme-light .bg-\[\#13111E\] {
   background-color: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-html.theme-light .bg-\[\#0D1117\] {
-  background-color: #f8fafc;
+html.theme-light .bg-\[\#0D1117\],
+html.theme-light .bg-\[\#161422\],
+html.theme-light .bg-\[\#171522\],
+html.theme-light .bg-\[\#181524\],
+html.theme-light .bg-\[\#191625\],
+html.theme-light .bg-\[\#1C1928\] {
+  background-color: #f4f3fa;
 }
 
 html.theme-light .bg-white\/\[0\.04\] {
@@ -437,6 +490,10 @@ html.theme-light .bg-black\/75 {
   background-color: rgba(15, 23, 42, 0.55);
 }
 
+html.theme-light .text-white:not([class*="bg-[#764AF1]"]):not([class*="bg-violet"]):not([class*="bg-emerald"]):not([class*="bg-red"]) {
+  color: #0f172a;
+}
+
 html.theme-light .text-zinc-100,
 html.theme-light .text-zinc-200,
 html.theme-light .hover\:text-zinc-100:hover,
@@ -467,6 +524,11 @@ html.theme-light .hover\:text-amber-300:hover {
   color: #b45309;
 }
 
+html.theme-light .text-violet-300,
+html.theme-light .text-violet-400 {
+  color: #6d28d9;
+}
+
 html.theme-light .text-emerald-400,
 html.theme-light .text-emerald-300,
 html.theme-light .text-emerald-200,
@@ -489,6 +551,7 @@ html.theme-light ::placeholder {
   color: #94a3b8;
 }
 
+html.theme-light .border-white\/\[0\.05\],
 html.theme-light .border-white\/\[0\.06\],
 html.theme-light .border-white\/\[0\.08\],
 html.theme-light .border-white\/\[0\.1\],
@@ -508,7 +571,7 @@ html.theme-light .focus-visible\:ring-offset-\[\#131820\]:focus-visible {
 }
 
 html.theme-light .btn-dynamic-ripple {
-  background: radial-gradient(circle, rgba(217, 119, 6, 0.4) 0%, rgba(245, 158, 11, 0.25) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(118, 74, 241, 0.35) 0%, rgba(139, 92, 246, 0.2) 40%, transparent 70%);
 }
 
 html.theme-light button:not(:disabled):hover,

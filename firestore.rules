@@ -241,7 +241,11 @@ service cloud.firestore {
           'priceBdt',
           'paymentMethod',
           'transactionId',
+          'senderPhone',
           'paymentVerified',
+          'paymentFlag',
+          'paymentFlagReason',
+          'confirmedAt',
           'status',
           'verifiedAtMs',
           'unlockAtMs',
@@ -283,7 +287,11 @@ service cloud.firestore {
         && data.paymentMethod.size() >= 1
         && data.paymentMethod.size() <= 80
         && (!('transactionId' in data) || (data.transactionId is string && data.transactionId.size() <= 32))
+        && (!('senderPhone' in data) || (data.senderPhone is string && data.senderPhone.size() <= 24))
         && (!('paymentVerified' in data) || data.paymentVerified is bool)
+        && (!('paymentFlag' in data) || (data.paymentFlag is string && data.paymentFlag.size() <= 64))
+        && (!('paymentFlagReason' in data) || (data.paymentFlagReason is string && data.paymentFlagReason.size() <= 300))
+        && (!('confirmedAt' in data) || (data.confirmedAt is string && data.confirmedAt.size() <= 64))
         && data.status is string
         && data.status in ['Waiting', 'Pending', 'Approved', 'Completed', 'Cancelled']
         && (data.verifiedAtMs is int || data.verifiedAtMs is float)
@@ -295,6 +303,118 @@ service cloud.firestore {
         && data.createdAtIso.size() <= 64
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
+    }
+
+    function isValidUniqueTrxRecord(data, trxId) {
+      return data.keys().hasAll([
+          'trxId',
+          'method',
+          'orderId',
+          'orderNumber',
+          'userEmail',
+          'amountBdt',
+          'status',
+          'usedAt',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'trxId',
+          'method',
+          'orderId',
+          'orderNumber',
+          'userEmail',
+          'amountBdt',
+          'status',
+          'usedAt',
+          'createdAt'
+        ])
+        && data.trxId is string
+        && data.trxId == trxId
+        && data.trxId.size() >= 6
+        && data.trxId.size() <= 32
+        && data.trxId.matches('^[A-Z0-9]+$')
+        && data.method is string
+        && data.method in ['Nagad', 'Rocket', 'bKash']
+        && data.orderId is string
+        && data.orderId.size() >= 1
+        && data.orderId.size() <= 128
+        && data.orderNumber is string
+        && data.orderNumber.size() >= 4
+        && data.orderNumber.size() <= 32
+        && data.userEmail is string
+        && data.userEmail.size() >= 3
+        && data.userEmail.size() <= 160
+        && (data.amountBdt is int || data.amountBdt is float)
+        && data.amountBdt > 0
+        && data.amountBdt <= 10000000
+        && data.status is string
+        && data.status in ['reserved_pending', 'verified_approved', 'flagged_mismatch']
+        && data.usedAt is string
+        && data.usedAt.size() >= 10
+        && data.usedAt.size() <= 64
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPaymentSecurityLog(data, logId) {
+      return data.keys().hasAll([
+          'id',
+          'category',
+          'eventType',
+          'trxId',
+          'paymentMethod',
+          'reason',
+          'source',
+          'flagged',
+          'createdAtIso',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'category',
+          'eventType',
+          'trxId',
+          'paymentMethod',
+          'submittedAmountBdt',
+          'matchedAmountBdt',
+          'senderPhone',
+          'receiverPhone',
+          'orderNumber',
+          'userEmail',
+          'reason',
+          'source',
+          'flagged',
+          'createdAtIso',
+          'createdAt'
+        ])
+        && data.id is string
+        && data.id == logId
+        && isValidId(data.id)
+        && data.category is string
+        && data.category in ['successful', 'failed', 'duplicate', 'suspicious']
+        && data.eventType is string
+        && data.eventType.size() >= 2
+        && data.eventType.size() <= 80
+        && data.trxId is string
+        && data.trxId.size() <= 32
+        && data.paymentMethod is string
+        && data.paymentMethod.size() >= 1
+        && data.paymentMethod.size() <= 32
+        && (!('submittedAmountBdt' in data) || ((data.submittedAmountBdt is int || data.submittedAmountBdt is float) && data.submittedAmountBdt >= 0 && data.submittedAmountBdt <= 10000000))
+        && (!('matchedAmountBdt' in data) || ((data.matchedAmountBdt is int || data.matchedAmountBdt is float) && data.matchedAmountBdt >= 0 && data.matchedAmountBdt <= 10000000))
+        && (!('senderPhone' in data) || (data.senderPhone is string && data.senderPhone.size() <= 40))
+        && (!('receiverPhone' in data) || (data.receiverPhone is string && data.receiverPhone.size() <= 40))
+        && (!('orderNumber' in data) || (data.orderNumber is string && data.orderNumber.size() <= 32))
+        && (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 160))
+        && data.reason is string
+        && data.reason.size() >= 1
+        && data.reason.size() <= 500
+        && data.source is string
+        && data.source in ['sms_webhook', 'admin_manual', 'checkout_api', 'orders_api']
+        && data.flagged is bool
+        && data.createdAtIso is string
+        && data.createdAtIso.size() >= 10
+        && data.createdAtIso.size() <= 64
+        && data.createdAt is timestamp;
     }
 
     // Public Storefront Packages (No PII; Admin-only writes)
@@ -385,7 +505,11 @@ service cloud.firestore {
           'priceBdt',
           'paymentMethod',
           'transactionId',
+          'senderPhone',
           'paymentVerified',
+          'paymentFlag',
+          'paymentFlagReason',
+          'confirmedAt',
           'status',
           'verifiedAtMs',
           'unlockAtMs',
@@ -393,6 +517,46 @@ service cloud.firestore {
         ]);
 
       allow delete: if isAdmin() && isValidId(orderId);
+    }
+
+    // Unique Transaction ID index (strict Admin-only access & atomic duplicate rejection)
+    match /usedTrxIds/{trxId} {
+      allow get: if isAdmin() && isValidId(trxId);
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && isValidId(trxId)
+        && isValidUniqueTrxRecord(incoming(), trxId)
+        && incoming().createdAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(trxId)
+        && isValidUniqueTrxRecord(incoming(), trxId)
+        && incoming().trxId == existing().trxId
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'orderId',
+          'orderNumber',
+          'amountBdt',
+          'status',
+          'usedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(trxId);
+    }
+
+    // Immutable Payment Security Audit Logs (Admin create & read only)
+    match /paymentSecurityLogs/{logId} {
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && isValidId(logId)
+        && isValidPaymentSecurityLog(incoming(), logId)
+        && incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if false;
     }
 
     // Users root collection (PII-isolated, owner-only)

@@ -63,7 +63,7 @@ async function compressAvatarFile(file: File): Promise<string> {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas unavailable.');
       if (mime === 'image/jpeg') {
-        ctx.fillStyle = '#131820';
+        ctx.fillStyle = '#110F1B';
         ctx.fillRect(0, 0, targetW, targetH);
       }
       ctx.drawImage(img, 0, 0, targetW, targetH);
@@ -271,7 +271,7 @@ export function ProfileModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl bg-[#131820] border border-white/10 shadow-2xl"
+            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl bg-[#110F1B] border border-white/10 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
@@ -308,7 +308,7 @@ export function ProfileModal({
             <div className="p-6 space-y-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Profile Picture Uploader */}
-                <div className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="rounded-lg bg-[#161422] border border-white/[0.08] p-4 flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
                     {avatar && !avatarLoadFailed ? (
                       <img
@@ -345,7 +345,7 @@ export function ProfileModal({
                       type="button"
                       disabled={isUploadingAvatar}
                       onClick={() => avatarInputRef.current?.click()}
-                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-amber-400/35 bg-amber-400/10 px-3.5 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 transition-colors disabled:opacity-60"
+                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-[#764AF1]/40 bg-[#764AF1]/15 px-3.5 py-1.5 text-xs font-semibold text-violet-200 hover:bg-[#764AF1]/25 transition-colors disabled:opacity-60"
                     >
                       {isUploadingAvatar ? (
                         <>
@@ -373,7 +373,7 @@ export function ProfileModal({
                 </div>
 
                 {/* Compact VIP Loyalty Tier Card */}
-                <div className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-4 space-y-3">
+                <div className="rounded-lg bg-[#161422] border border-white/[0.08] p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${userTier.borderClass} ${userTier.bgClass} ${userTier.textClass}`}>
@@ -416,7 +416,7 @@ export function ProfileModal({
 
                   {/* Compact Progress Bar */}
                   <div className="space-y-1">
-                    <div className="relative h-2 w-full rounded-full bg-[#131820] border border-white/10 overflow-hidden">
+                    <div className="relative h-2 w-full rounded-full bg-[#110F1B] border border-white/10 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-amber-600 via-amber-400 via-sky-400 to-purple-500 transition-all duration-500"
                         style={{ width: `${Math.max(2, Math.min(100, tierProgress))}%` }}
@@ -452,7 +452,7 @@ export function ProfileModal({
                         setName(e.target.value);
                         setSavedNotice(null);
                       }}
-                      className="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                      className="w-full min-h-[42px] rounded-lg bg-[#0A090F] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#764AF1]"
                     />
                   </div>
                   <div>
@@ -468,7 +468,7 @@ export function ProfileModal({
                         setEmail(e.target.value);
                         setSavedNotice(null);
                       }}
-                      className="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                      className="w-full min-h-[42px] rounded-lg bg-[#0A090F] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#764AF1]"
                     />
                   </div>
                   <div>
@@ -484,7 +484,7 @@ export function ProfileModal({
                         setPhone(e.target.value);
                         setSavedNotice(null);
                       }}
-                      className="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                      className="w-full min-h-[42px] rounded-lg bg-[#0A090F] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#764AF1]"
                     />
                   </div>
                   <div>
@@ -501,7 +501,7 @@ export function ProfileModal({
                         setPassword(e.target.value);
                         setSavedNotice(null);
                       }}
-                      className="w-full min-h-[42px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                      className="w-full min-h-[42px] rounded-lg bg-[#0A090F] border border-white/10 px-3.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-[#764AF1]"
                     />
                   </div>
                 </div>
@@ -523,7 +523,7 @@ export function ProfileModal({
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="min-h-[42px] rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+                    className="min-h-[42px] rounded-full bg-[#764AF1] px-6 py-2 text-sm font-semibold text-white hover:bg-[#855DF7] transition-colors"
                   >
                     Save Profile Changes
                   </button>
@@ -576,7 +576,7 @@ export function ProfileModal({
                       return (
                         <div
                           key={order.id}
-                          className={`rounded-lg bg-[#0D1117] border p-3.5 space-y-2.5 text-xs ${
+                          className={`rounded-lg bg-[#161422] border p-3.5 space-y-2.5 text-xs ${
                             isConfirmed ? 'border-emerald-500/35' : 'border-white/[0.08]'
                           }`}
                         >
@@ -637,7 +637,7 @@ export function ProfileModal({
                                 aria-valuemin={0}
                                 aria-valuemax={100}
                                 aria-valuenow={Math.round(holdProgress.percent)}
-                                className="h-1.5 w-full rounded-full bg-[#131820] border border-white/10 overflow-hidden"
+                                className="h-1.5 w-full rounded-full bg-[#110F1B] border border-white/10 overflow-hidden"
                               >
                                 <div
                                   className={`h-full rounded-full transition-all duration-500 ${

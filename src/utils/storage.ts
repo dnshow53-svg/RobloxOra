@@ -55,10 +55,9 @@ export function loadPackages(): RobuxPackage[] {
     priceBdt: Number(pkg.priceBdt) || Math.round(Number(pkg.priceUsd || 5) * 118),
     deliveryNote: pkg.deliveryNote,
     image:
-      typeof pkg.image === 'string' &&
-      !pkg.image.startsWith('/src/assets/images/pkg_')
-        ? pkg.image
-        : '',
+      typeof pkg.image === 'string' && pkg.image.trim()
+        ? pkg.image.trim()
+        : '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
   }));
 }
 

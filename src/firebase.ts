@@ -16,6 +16,7 @@ import {
   getFirestore,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -26,6 +27,7 @@ import {
   ADMIN_EMAIL,
   GroupSettings,
   OrderRecord,
+  PaymentSecurityLog,
   RobuxPackage,
   normalizeOrderStatus,
 } from './data/packages';
@@ -366,10 +368,9 @@ export function subscribeStorePackages(
             priceBdt: Number(d.priceBdt || 0),
             deliveryNote: String(d.deliveryNote || 'Group Payout'),
             image:
-              typeof d.image === 'string' &&
-              !d.image.startsWith('/src/assets/images/pkg_')
-                ? d.image
-                : '',
+              typeof d.image === 'string' && d.image.trim()
+                ? d.image.trim()
+                : '/src/assets/images/pkg_starter_vault_1795779453204.jpg',
           };
         })
         .filter((p) => p.robux > 0 && p.priceBdt > 0)
@@ -394,10 +395,9 @@ export async function upsertStorePackage(pkg: RobuxPackage): Promise<void> {
   const ref = doc(db, 'packages', safeId);
 
   const cleanImage =
-    typeof pkg.image === 'string' &&
-    !pkg.image.startsWith('/src/assets/images/pkg_')
-      ? pkg.image.trim().slice(0, 500)
-      : '';
+    typeof pkg.image === 'string' && pkg.image.trim()
+      ? pkg.image.trim()
+      : '/src/assets/images/pkg_starter_vault_1795779453204.jpg';
 
   const payload = {
     robux: Math.max(1, Math.min(10000000, Number(pkg.robux) || 1)),
@@ -544,7 +544,23 @@ export function subscribeStoreOrders(
               typeof d.transactionId === 'string' && d.transactionId
                 ? d.transactionId
                 : undefined,
+            senderPhone:
+              typeof d.senderPhone === 'string' && d.senderPhone
+                ? d.senderPhone
+                : undefined,
             paymentVerified: Boolean(d.paymentVerified),
+            paymentFlag:
+              typeof d.paymentFlag === 'string' && d.paymentFlag
+                ? d.paymentFlag
+                : undefined,
+            paymentFlagReason:
+              typeof d.paymentFlagReason === 'string' && d.paymentFlagReason
+                ? d.paymentFlagReason
+                : undefined,
+            confirmedAt:
+              typeof d.confirmedAt === 'string' && d.confirmedAt
+                ? d.confirmedAt
+                : undefined,
             status: normalizeOrderStatus(d.status),
             verifiedAtMs: Number(d.verifiedAtMs || 0) || undefined,
             unlockAtMs: Number(d.unlockAtMs || 0) || undefined,
@@ -610,7 +626,11 @@ export async function upsertStoreOrder(order: OrderRecord): Promise<void> {
       .trim()
       .toUpperCase()
       .slice(0, 32),
+    senderPhone: String(order.senderPhone || '').trim().slice(0, 24),
     paymentVerified: Boolean(order.paymentVerified),
+    paymentFlag: String(order.paymentFlag || '').trim().slice(0, 64),
+    paymentFlagReason: String(order.paymentFlagReason || '').trim().slice(0, 300),
+    confirmedAt: String(order.confirmedAt || '').trim().slice(0, 64),
     status: order.status,
     verifiedAtMs: Math.max(0, Number(order.verifiedAtMs) || 0),
     unlockAtMs: Math.max(0, Number(order.unlockAtMs) || 0),
@@ -645,5 +665,142 @@ export async function removeStoreOrder(orderId: string): Promise<void> {
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
+}
+
+export async function reserveUniqueTrxIdInFirestore(params: {
+  trxId: string;
+  method: 'Nagad' | 'Rocket' | 'bKash';
+  orderId: string;
+  orderNumber: string;
+  userEmail: string;
+  amountBdt: number;
+  status: 'reserved_pending' | 'verified_approved' | 'flagged_mismatch';
+  usedAt?: string;
+}): Promise<void> {
+  const cleanTrx = params.trxId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+  if (cleanTrx.length < 6) return;
+  const path = `usedTrxIds/${cleanTrx}`;
+  const ref = doc(db, 'usedTrxIds', cleanTrx);
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const usedAt = (params.usedAt || new Date().toISOString()).slice(0, 64);
+      const safeOrderNum =
+        params.orderNumber.toUpperCase().replace(/[^A-Z0-9\-]/g, '').slice(0, 32) || 'BM-0000';
+      if (!snap.exists()) {
+        tx.set(ref, {
+          trxId: cleanTrx,
+          method: params.method,
+          orderId: sanitizeDocId(params.orderId),
+          orderNumber: safeOrderNum.length >= 4 ? safeOrderNum : 'BM-0000',
+          userEmail: params.userEmail.trim().slice(0, 160),
+          amountBdt: Math.max(1, Math.min(10000000, Number(params.amountBdt) || 1)),
+          status: params.status,
+          usedAt: usedAt.length >= 10 ? usedAt : new Date().toISOString(),
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        const existing = snap.data();
+        if (existing.orderId !== sanitizeDocId(params.orderId)) {
+          throw new Error(`Duplicate Transaction ID ${cleanTrx} already claimed by Order ${String(existing.orderNumber || '')}.`);
+        }
+        tx.update(ref, {
+          orderId: sanitizeDocId(params.orderId),
+          orderNumber: safeOrderNum.length >= 4 ? safeOrderNum : 'BM-0000',
+          amountBdt: Math.max(1, Math.min(10000000, Number(params.amountBdt) || 1)),
+          status: params.status,
+          usedAt: usedAt.length >= 10 ? usedAt : new Date().toISOString(),
+        });
+      }
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function upsertPaymentSecurityLog(log: PaymentSecurityLog): Promise<void> {
+  const safeId = sanitizeDocId(log.id);
+  const path = `paymentSecurityLogs/${safeId}`;
+  const ref = doc(db, 'paymentSecurityLogs', safeId);
+
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) return;
+    const payload: Record<string, unknown> = {
+      id: safeId,
+      category: log.category,
+      eventType: String(log.eventType || 'SECURITY_EVENT').slice(0, 80),
+      trxId: String(log.trxId || '').trim().toUpperCase().slice(0, 32),
+      paymentMethod: (String(log.paymentMethod || 'Nagad').trim() || 'Nagad').slice(0, 32),
+      reason: (String(log.reason || 'Recorded security event').trim() || 'Event').slice(0, 500),
+      source: log.source || 'checkout_api',
+      flagged: Boolean(log.flagged),
+      createdAtIso: String(log.createdAt || new Date().toISOString()).slice(0, 64),
+      createdAt: serverTimestamp(),
+    };
+    if (typeof log.submittedAmountBdt === 'number' && Number.isFinite(log.submittedAmountBdt) && log.submittedAmountBdt >= 0) {
+      payload.submittedAmountBdt = Math.min(10000000, log.submittedAmountBdt);
+    }
+    if (typeof log.matchedAmountBdt === 'number' && Number.isFinite(log.matchedAmountBdt) && log.matchedAmountBdt >= 0) {
+      payload.matchedAmountBdt = Math.min(10000000, log.matchedAmountBdt);
+    }
+    if (log.senderPhone) payload.senderPhone = String(log.senderPhone).slice(0, 40);
+    if (log.receiverPhone) payload.receiverPhone = String(log.receiverPhone).slice(0, 40);
+    if (log.orderNumber) payload.orderNumber = String(log.orderNumber).slice(0, 32);
+    if (log.userEmail) payload.userEmail = String(log.userEmail).slice(0, 160);
+
+    await setDoc(ref, payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+export function subscribePaymentSecurityLogs(
+  onData: (logs: PaymentSecurityLog[]) => void,
+  onError?: (error: Error) => void
+) {
+  const path = 'paymentSecurityLogs';
+  const col = collection(db, path);
+
+  return onSnapshot(
+    col,
+    (snapshot) => {
+      const items: PaymentSecurityLog[] = snapshot.docs
+        .map((docSnap) => {
+          const d = docSnap.data();
+          return {
+            id: String(d.id || docSnap.id),
+            category: (d.category as PaymentSecurityLog['category']) || 'failed',
+            eventType: String(d.eventType || ''),
+            trxId: String(d.trxId || ''),
+            paymentMethod: String(d.paymentMethod || 'Nagad'),
+            submittedAmountBdt:
+              typeof d.submittedAmountBdt === 'number' ? d.submittedAmountBdt : undefined,
+            matchedAmountBdt:
+              typeof d.matchedAmountBdt === 'number' ? d.matchedAmountBdt : undefined,
+            senderPhone: typeof d.senderPhone === 'string' && d.senderPhone ? d.senderPhone : undefined,
+            receiverPhone: typeof d.receiverPhone === 'string' && d.receiverPhone ? d.receiverPhone : undefined,
+            orderNumber: typeof d.orderNumber === 'string' && d.orderNumber ? d.orderNumber : undefined,
+            userEmail: typeof d.userEmail === 'string' && d.userEmail ? d.userEmail : undefined,
+            reason: String(d.reason || ''),
+            source: (d.source as PaymentSecurityLog['source']) || 'checkout_api',
+            flagged: Boolean(d.flagged),
+            createdAt: String(d.createdAtIso || new Date().toISOString()),
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      onData(items);
+    },
+    (error) => {
+      try {
+        handleFirestoreError(error, OperationType.LIST, path);
+      } catch (wrapped) {
+        if (onError && wrapped instanceof Error) {
+          onError(wrapped);
+        }
+      }
+    }
+  );
 }
 

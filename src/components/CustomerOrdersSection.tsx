@@ -58,7 +58,7 @@ export function CustomerOrdersSection({
       <div className="max-w-6xl mx-auto px-6 space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-medium tracking-wide text-amber-400 mb-2">
+            <p className="text-xs font-medium tracking-wide text-violet-300 mb-2">
               Live Order Tracker
             </p>
             <h2
@@ -75,9 +75,9 @@ export function CustomerOrdersSection({
           <button
             type="button"
             onClick={onRefresh}
-            className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-[#131820] border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:border-amber-400/50 hover:text-white transition-colors self-start sm:self-auto shrink-0"
+            className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-[#110F1B] border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:border-[#764AF1]/60 hover:text-white transition-colors self-start sm:self-auto shrink-0"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+            <RefreshCw className="w-3.5 h-3.5 text-violet-300" aria-hidden="true" />
             <span>Refresh Status</span>
           </button>
         </div>
@@ -112,7 +112,7 @@ export function CustomerOrdersSection({
         )}
 
         {normalizedOrders.length === 0 ? (
-          <div className="rounded-xl bg-[#131820] border border-white/[0.08] p-8 text-center space-y-2">
+          <div className="rounded-xl bg-[#110F1B] border border-white/[0.08] p-8 text-center space-y-2">
             <p className="text-sm font-medium text-zinc-200">
               No orders placed under your account yet.
             </p>
@@ -182,7 +182,7 @@ export function CustomerOrdersSection({
               return (
                 <article
                   key={order.id}
-                  className={`rounded-xl bg-[#131820] border p-5 space-y-4 ${
+                  className={`rounded-xl bg-[#110F1B] border p-5 space-y-4 ${
                     isConfirmed
                       ? 'border-emerald-500/40'
                       : isCancelled
@@ -264,7 +264,7 @@ export function CustomerOrdersSection({
                       className={`rounded-lg border p-3.5 space-y-2.5 ${
                         holdProgress.isComplete
                           ? 'bg-emerald-500/[0.08] border-emerald-500/30'
-                          : 'bg-[#0D1117] border-amber-400/25'
+                          : 'bg-[#161422] border-amber-400/25'
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -299,7 +299,7 @@ export function CustomerOrdersSection({
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={Math.round(holdProgress.percent)}
-                        className="relative h-2.5 w-full rounded-full bg-[#090B0E] border border-white/10 overflow-hidden"
+                        className="relative h-2.5 w-full rounded-full bg-[#0A090F] border border-white/10 overflow-hidden"
                       >
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
@@ -341,7 +341,7 @@ export function CustomerOrdersSection({
                     {statusDescription}
                   </p>
 
-                  <div className="rounded-lg bg-[#0D1117] border border-white/[0.06] p-3.5 grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+                  <div className="rounded-lg bg-[#161422] border border-white/[0.06] p-3.5 grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
                     <div>
                       <span className="text-zinc-500 block text-[11px]">Roblox Account</span>
                       <span className="font-mono text-zinc-100">

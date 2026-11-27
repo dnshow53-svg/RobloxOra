@@ -1,5 +1,21 @@
 import { useEffect, useState } from 'react';
 
+export function BrandShardLogo({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 28 28"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="M15.5 3L6 14.5H13.2L11.5 25L22 13.5H14.8L15.5 3Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export function RobuxMark({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg

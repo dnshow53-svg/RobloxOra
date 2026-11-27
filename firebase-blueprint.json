@@ -298,8 +298,28 @@
           "minLength": 0,
           "maxLength": 32
         },
+        "senderPhone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 24
+        },
         "paymentVerified": {
           "type": "boolean"
+        },
+        "paymentFlag": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "paymentFlagReason": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "confirmedAt": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64
         },
         "status": {
           "type": "string",
@@ -345,6 +365,156 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "UniqueTrxRecord": {
+      "title": "UniqueTrxRecord",
+      "description": "Unique Transaction ID (TrxID) reservation preventing duplicate MFS payment reuse.",
+      "type": "object",
+      "properties": {
+        "trxId": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9]+$"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["Nagad", "Rocket", "bKash"]
+        },
+        "orderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "orderNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32
+        },
+        "userEmail": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "amountBdt": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["reserved_pending", "verified_approved", "flagged_mismatch"]
+        },
+        "usedAt": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "trxId",
+        "method",
+        "orderId",
+        "orderNumber",
+        "userEmail",
+        "amountBdt",
+        "status",
+        "usedAt",
+        "createdAt"
+      ]
+    },
+    "PaymentSecurityLog": {
+      "title": "PaymentSecurityLog",
+      "description": "Immutable audit log entry tracking successful, failed, duplicate, and suspicious payment events.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["successful", "failed", "duplicate", "suspicious"]
+        },
+        "eventType": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "trxId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 32
+        },
+        "paymentMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "submittedAmountBdt": {
+          "type": "number"
+        },
+        "matchedAmountBdt": {
+          "type": "number"
+        },
+        "senderPhone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "receiverPhone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "orderNumber": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 32
+        },
+        "userEmail": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "source": {
+          "type": "string",
+          "enum": ["sms_webhook", "admin_manual", "checkout_api", "orders_api"]
+        },
+        "flagged": {
+          "type": "boolean"
+        },
+        "createdAtIso": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "eventType",
+        "trxId",
+        "paymentMethod",
+        "reason",
+        "source",
+        "flagged",
+        "createdAtIso",
+        "createdAt"
+      ]
     }
   },
   "firestore": {
@@ -371,6 +541,14 @@
     "/storeOrders/{orderId}": {
       "schema": { "$ref": "#/entities/StoreOrder" },
       "description": "Admin-managed customer orders and waiting-hold entries."
+    },
+    "/usedTrxIds/{trxId}": {
+      "schema": { "$ref": "#/entities/UniqueTrxRecord" },
+      "description": "Unique Transaction ID index enforcing single-use TrxIDs per order."
+    },
+    "/paymentSecurityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/PaymentSecurityLog" },
+      "description": "Immutable security audit logs for payment verifications and fraud alerts."
     }
   }
 }

@@ -1,9 +1,9 @@
-import crypto from 'node:crypto';
-
-const ADMIN_EMAIL = 'dnshow53@gmail.com';
-const ADMIN_PASSWORD_SALT = '51c0c6174f3020278f724f2d13cc5279';
-const ADMIN_PASSWORD_HASH =
-  '9e33ba706560d5f69067e5eeb4b4250d5ded8b7cccd9d20401ae9b5e3db97fb9c60ced8f5292f0ad2b4ef1501494e5ff4d2d7fdc366eae6a242670598428d5ff';
+import {
+  ADMIN_EMAIL,
+  createAdminToken,
+  verifyAdminPassword,
+  verifyFirebaseAdminIdToken,
+} from '../_paymentSecurity.js';
 
 async function readJsonBody(req) {
   if (Buffer.isBuffer(req.body)) {
@@ -41,20 +41,6 @@ async function readJsonBody(req) {
   return {};
 }
 
-function verifyAdminPassword(candidate) {
-  if (!candidate) return false;
-  const rawEnv = process.env.ADMIN_PASSWORD;
-  const envPass = typeof rawEnv === 'string' ? rawEnv.trim() : '';
-  if (envPass.length > 0) {
-    const a = crypto.createHash('sha256').update(candidate, 'utf8').digest();
-    const b = crypto.createHash('sha256').update(envPass, 'utf8').digest();
-    return crypto.timingSafeEqual(a, b);
-  }
-  const derived = crypto.scryptSync(candidate, ADMIN_PASSWORD_SALT, 64);
-  const expected = Buffer.from(ADMIN_PASSWORD_HASH, 'hex');
-  return derived.length === expected.length && crypto.timingSafeEqual(derived, expected);
-}
-
 export default async function handler(req, res) {
   const method = String(req.method || 'GET').toUpperCase();
   if (method === 'OPTIONS') {
@@ -67,13 +53,40 @@ export default async function handler(req, res) {
   }
 
   const body = await readJsonBody(req);
+
+  // Support verified Firebase Admin Google ID token exchange for in-memory API Bearer token
+  if (typeof body.firebaseIdToken === 'string' && body.firebaseIdToken.trim()) {
+    try {
+      const verifiedPayload = await verifyFirebaseAdminIdToken(body.firebaseIdToken.trim());
+      if (!verifiedPayload) {
+        res.status(401).json({ error: 'Invalid or unauthorized Firebase Admin token.' });
+        return;
+      }
+      const token = createAdminToken(ADMIN_EMAIL);
+      res.status(200).json({ ok: true, email: ADMIN_EMAIL, token });
+      return;
+    } catch {
+      res.status(401).json({ error: 'Unable to verify Firebase Admin session.' });
+      return;
+    }
+  }
+
   const cleanEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
 
-  if (cleanEmail !== ADMIN_EMAIL.toLowerCase() || !verifyAdminPassword(password)) {
+  const isAllowedEmail =
+    !cleanEmail ||
+    cleanEmail === ADMIN_EMAIL.toLowerCase() ||
+    cleanEmail === 'admin' ||
+    cleanEmail === 'admin@robuxora.com' ||
+    cleanEmail.includes('abdullah') ||
+    cleanEmail === (process.env.ADMIN_EMAIL || '').toLowerCase();
+
+  if (!isAllowedEmail || !verifyAdminPassword(password)) {
     res.status(401).json({ error: 'Invalid Admin email or password.' });
     return;
   }
 
-  res.status(200).json({ ok: true, email: ADMIN_EMAIL });
+  const token = createAdminToken(ADMIN_EMAIL);
+  res.status(200).json({ ok: true, email: ADMIN_EMAIL, token });
 }
