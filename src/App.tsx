@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -72,12 +72,22 @@ import {
 } from './firebase';
 import { verifyRobloxMembership } from './utils/robloxApi';
 import { ResilientImage, RobuxMark } from './components/RobuxIcon';
-import { VerificationModal } from './components/VerificationModal';
 import { VerificationAndPaymentSection } from './components/VerificationAndPaymentSection';
-import { AuthModal, AuthModalMode } from './components/AuthModal';
-import { ProfileModal } from './components/ProfileModal';
-import { AdminDashboard } from './components/AdminDashboard';
+import type { AuthModalMode } from './components/AuthModal';
 import { CustomerOrdersSection } from './components/CustomerOrdersSection';
+
+const VerificationModal = lazy(() =>
+  import('./components/VerificationModal').then((m) => ({ default: m.VerificationModal }))
+);
+const AuthModal = lazy(() =>
+  import('./components/AuthModal').then((m) => ({ default: m.AuthModal }))
+);
+const ProfileModal = lazy(() =>
+  import('./components/ProfileModal').then((m) => ({ default: m.ProfileModal }))
+);
+const AdminDashboard = lazy(() =>
+  import('./components/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
 import { LoyaltyTierBar } from './components/LoyaltyTierBar';
 import { RestockCountdownCard } from './components/RestockCountdownCard';
 
@@ -2755,32 +2765,34 @@ export default function App() {
 
         {/* ADMIN CONTROL PANEL */}
         {isAdmin && (
-          <AdminDashboard
-            packages={packages}
-            orders={orders}
-            users={users}
-            verifiedPayments={verifiedPayments}
-            groupSettings={groupSettings}
-            isCloudConnected={isCloudConnected}
-            connectedCloudEmail={firebaseUser?.email || null}
-            isSyncingCloud={isSyncingCloud}
-            onConnectCloud={(force) => void handleConnectCloud(force)}
-            onSyncCloudNow={() => void syncAllToFirestore()}
-            onSignOut={handleSignOut}
-            onAddPackage={handleAddPackage}
-            onUpdatePackage={handleUpdatePackage}
-            onDeletePackage={handleDeletePackage}
-            onUpdateOrderStatus={(id, st) => handleUpdateOrderStatus(id, st)}
-            onUnlockOrderTimer={(id) => void handleUnlockOrderTimer(id)}
-            onDeleteOrder={handleDeleteOrder}
-            onAddVerifiedPayment={handleAddVerifiedPayment}
-            onDeleteVerifiedPayment={(id) => void handleDeleteVerifiedPayment(id)}
-            onRefreshOrders={() => {
-              void syncFromServer();
-              if (isCloudConnected) void syncAllToFirestore();
-            }}
-            onSaveGroupSettings={handleSaveGroupSettings}
-          />
+          <Suspense fallback={null}>
+            <AdminDashboard
+              packages={packages}
+              orders={orders}
+              users={users}
+              verifiedPayments={verifiedPayments}
+              groupSettings={groupSettings}
+              isCloudConnected={isCloudConnected}
+              connectedCloudEmail={firebaseUser?.email || null}
+              isSyncingCloud={isSyncingCloud}
+              onConnectCloud={(force) => void handleConnectCloud(force)}
+              onSyncCloudNow={() => void syncAllToFirestore()}
+              onSignOut={handleSignOut}
+              onAddPackage={handleAddPackage}
+              onUpdatePackage={handleUpdatePackage}
+              onDeletePackage={handleDeletePackage}
+              onUpdateOrderStatus={(id, st) => handleUpdateOrderStatus(id, st)}
+              onUnlockOrderTimer={(id) => void handleUnlockOrderTimer(id)}
+              onDeleteOrder={handleDeleteOrder}
+              onAddVerifiedPayment={handleAddVerifiedPayment}
+              onDeleteVerifiedPayment={(id) => void handleDeleteVerifiedPayment(id)}
+              onRefreshOrders={() => {
+                void syncFromServer();
+                if (isCloudConnected) void syncAllToFirestore();
+              }}
+              onSaveGroupSettings={handleSaveGroupSettings}
+            />
+          </Suspense>
         )}
 
         {/* 1. HERO SECTION */}
@@ -3194,78 +3206,90 @@ export default function App() {
       </footer>
 
       {/* Checkout & Real-Time API Verification Modal */}
-      <VerificationModal
-        isOpen={isCheckoutModalOpen}
-        isSignedIn={isSignedIn}
-        isAdmin={isAdmin}
-        selectedPackage={selectedPackage}
-        groupSettings={groupSettings}
-        availableRobux={groupSettings?.availableRobux ?? 25400}
-        robloxUsername={timerState.robloxUsername}
-        onUsernameChange={handleUsernameChange}
-        hasClickedGroupLink={timerState.hasClickedGroupLink}
-        isGroupVerified={isSignedIn && timerState.isGroupVerified}
-        isVerifyingApi={isVerifyingApi}
-        isSubmittingOrder={isSubmittingOrder}
-        remainingSeconds={
-          isSignedIn && timerState.isGroupVerified
-            ? remainingSeconds
-            : FIFTEEN_DAYS_SECONDS
-        }
-        savedVerifiedTimers={savedVerifiedTimers}
-        errorMessage={errorMessage}
-        paymentError={paymentError}
-        selectedPaymentId={selectedPaymentId}
-        orderReceipt={orderReceipt}
-        onClose={() => setIsCheckoutModalOpen(false)}
-        onRequireSignIn={requireSignInPrompt}
-        onGroupLinkClick={handleGroupLinkClick}
-        onVerifyMembership={handleVerifyMembership}
-        onSwitchRobloxUsername={handleSwitchRobloxUsername}
-        onSelectSavedUsername={handleSelectSavedUsername}
-        onAdminUnlockTimer={handleAdminUnlockTimer}
-        onClearPaymentError={() => setPaymentError(null)}
-        onSelectPayment={(id) => {
-          setPaymentError(null);
-          setSelectedPaymentId(id);
-        }}
-        onShowOutOfStock={() => {
-          if (!selectedPackage) return;
-          setOutOfStockAlert({
-            available: Math.max(0, groupSettings?.availableRobux ?? 25400),
-            needed: selectedPackage.robux,
-            packageTitle: selectedPackage.title,
-          });
-        }}
-        onSubmitOrder={(trxId) => void handleCompleteOrder(trxId)}
-      />
+      {isCheckoutModalOpen && (
+        <Suspense fallback={null}>
+          <VerificationModal
+            isOpen={isCheckoutModalOpen}
+            isSignedIn={isSignedIn}
+            isAdmin={isAdmin}
+            selectedPackage={selectedPackage}
+            groupSettings={groupSettings}
+            availableRobux={groupSettings?.availableRobux ?? 25400}
+            robloxUsername={timerState.robloxUsername}
+            onUsernameChange={handleUsernameChange}
+            hasClickedGroupLink={timerState.hasClickedGroupLink}
+            isGroupVerified={isSignedIn && timerState.isGroupVerified}
+            isVerifyingApi={isVerifyingApi}
+            isSubmittingOrder={isSubmittingOrder}
+            remainingSeconds={
+              isSignedIn && timerState.isGroupVerified
+                ? remainingSeconds
+                : FIFTEEN_DAYS_SECONDS
+            }
+            savedVerifiedTimers={savedVerifiedTimers}
+            errorMessage={errorMessage}
+            paymentError={paymentError}
+            selectedPaymentId={selectedPaymentId}
+            orderReceipt={orderReceipt}
+            onClose={() => setIsCheckoutModalOpen(false)}
+            onRequireSignIn={requireSignInPrompt}
+            onGroupLinkClick={handleGroupLinkClick}
+            onVerifyMembership={handleVerifyMembership}
+            onSwitchRobloxUsername={handleSwitchRobloxUsername}
+            onSelectSavedUsername={handleSelectSavedUsername}
+            onAdminUnlockTimer={handleAdminUnlockTimer}
+            onClearPaymentError={() => setPaymentError(null)}
+            onSelectPayment={(id) => {
+              setPaymentError(null);
+              setSelectedPaymentId(id);
+            }}
+            onShowOutOfStock={() => {
+              if (!selectedPackage) return;
+              setOutOfStockAlert({
+                available: Math.max(0, groupSettings?.availableRobux ?? 25400),
+                needed: selectedPackage.robux,
+                packageTitle: selectedPackage.title,
+              });
+            }}
+            onSubmitOrder={(trxId) => void handleCompleteOrder(trxId)}
+          />
+        </Suspense>
+      )}
 
       {/* Sign In / Create Account / Admin Sign In Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        initialMode={authModalMode}
-        noticeMessage={authNotice}
-        users={users}
-        onClose={() => {
-          setIsAuthModalOpen(false);
-          setAuthNotice(null);
-          setPendingCheckoutAfterAuth(false);
-        }}
-        onUserSignIn={handleUserSignIn}
-        onUserSignUp={handleUserSignUp}
-        onAdminSignIn={handleAdminSignIn}
-      />
+      {isAuthModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            initialMode={authModalMode}
+            noticeMessage={authNotice}
+            users={users}
+            onClose={() => {
+              setIsAuthModalOpen(false);
+              setAuthNotice(null);
+              setPendingCheckoutAfterAuth(false);
+            }}
+            onUserSignIn={handleUserSignIn}
+            onUserSignUp={handleUserSignUp}
+            onAdminSignIn={handleAdminSignIn}
+          />
+        </Suspense>
+      )}
 
       {/* User Profile & Personal Order History Modal */}
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        user={currentUser}
-        existingUsers={users}
-        orders={userOrders}
-        onClose={() => setIsProfileModalOpen(false)}
-        onSaveProfile={handleSaveProfile}
-        onSignOut={handleSignOut}
-      />
+      {isProfileModalOpen && (
+        <Suspense fallback={null}>
+          <ProfileModal
+            isOpen={isProfileModalOpen}
+            user={currentUser}
+            existingUsers={users}
+            orders={userOrders}
+            onClose={() => setIsProfileModalOpen(false)}
+            onSaveProfile={handleSaveProfile}
+            onSignOut={handleSignOut}
+          />
+        </Suspense>
+      )}
 
       {/* Robux Out of Stock Popup */}
       {outOfStockAlert && (

@@ -521,3 +521,41 @@ html.theme-light a.bg-amber-400:hover {
   box-shadow: 0 0 18px rgba(217, 119, 6, 0.45), 0 6px 18px rgba(15, 23, 42, 0.12);
 }
 
+/* Preserve Obsidian-Mauve Admin Dashboard contrast regardless of storefront light theme */
+html.theme-light .admin-obsidian-shell .text-zinc-100,
+html.theme-light .admin-obsidian-shell .text-zinc-200 {
+  color: #f4f4f5;
+}
+
+html.theme-light .admin-obsidian-shell .text-zinc-300 {
+  color: #d4d4d8;
+}
+
+html.theme-light .admin-obsidian-shell .text-zinc-400 {
+  color: #a1a1aa;
+}
+
+html.theme-light .admin-obsidian-shell .text-zinc-500 {
+  color: #71717a;
+}
+
+html.theme-light .admin-obsidian-shell .text-emerald-300,
+html.theme-light .admin-obsidian-shell .text-emerald-400 {
+  color: #6ee7b7;
+}
+
+html.theme-light .admin-obsidian-shell .text-amber-300,
+html.theme-light .admin-obsidian-shell .text-amber-400 {
+  color: #fcd34d;
+}
+
+html.theme-light .admin-obsidian-shell .text-red-300,
+html.theme-light .admin-obsidian-shell .text-red-400 {
+  color: #fca5a5;
+}
+
+html.theme-light .admin-obsidian-shell .text-sky-300 {
+  color: #7dd3fc;
+}
+
+
