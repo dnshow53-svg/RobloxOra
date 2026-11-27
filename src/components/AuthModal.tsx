@@ -135,7 +135,13 @@ export function AuthModal({
       });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; email?: string; error?: string } | null;
       if (!res.ok || !data?.ok) {
-        setError(data?.error || 'Invalid Admin email or password.');
+        if (data?.error) {
+          setError(data.error);
+        } else if (res.status === 401) {
+          setError('Invalid Admin email or password.');
+        } else {
+          setError(`Admin verification failed (HTTP ${res.status}). Please redeploy or check server logs.`);
+        }
         return;
       }
       setError(null);

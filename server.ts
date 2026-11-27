@@ -12,8 +12,9 @@ const ADMIN_PASSWORD_HASH =
 
 function verifyAdminPassword(candidate: string): boolean {
   if (!candidate) return false;
-  const envPass = process.env.ADMIN_PASSWORD;
-  if (typeof envPass === 'string' && envPass.length > 0) {
+  const rawEnv = process.env.ADMIN_PASSWORD;
+  const envPass = typeof rawEnv === 'string' ? rawEnv.trim() : '';
+  if (envPass.length > 0) {
     const a = crypto.createHash('sha256').update(candidate, 'utf8').digest();
     const b = crypto.createHash('sha256').update(envPass, 'utf8').digest();
     return crypto.timingSafeEqual(a, b);
