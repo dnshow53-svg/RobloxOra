@@ -4,7 +4,15 @@ export default async function handler(req, res) {
     return;
   }
 
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  let rawBody = req.body;
+  if (typeof rawBody === 'string' && rawBody.trim()) {
+    try {
+      rawBody = JSON.parse(rawBody);
+    } catch {
+      rawBody = {};
+    }
+  }
+  const body = rawBody && typeof rawBody === 'object' ? rawBody : {};
   const cleanUsername = String(body.username || '').trim();
   const targetGroupId = Number(body.groupId);
 
@@ -27,6 +35,8 @@ export default async function handler(req, res) {
           'User-Agent': 'RobuxOra-Verifier/1.0',
         },
         body: JSON.stringify({ usernames: [cleanUsername], excludeBannedUsers: true }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!userRes.ok) {
@@ -61,6 +71,8 @@ export default async function handler(req, res) {
           Pragma: 'no-cache',
           'User-Agent': 'RobuxOra-Verifier/1.0',
         },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
       }
     );
 

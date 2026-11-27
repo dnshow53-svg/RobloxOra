@@ -23,6 +23,7 @@ import {
   calculateTierProgressPercent,
   calculateUserTotalSpend,
   getNextLoyaltyTier,
+  getSecurityHoldProgress,
   getUserLoyaltyTier,
 } from '../data/packages';
 
@@ -113,7 +114,22 @@ export function ProfileModal({
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const hasPendingHold = orders.some(
+      (o) =>
+        o.status !== 'Cancelled' &&
+        typeof o.unlockAtMs === 'number' &&
+        o.unlockAtMs > Date.now()
+    );
+    if (!hasPendingHold) return;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [isOpen, orders]);
 
   const userTotalSpend = useMemo(() => {
     return calculateUserTotalSpend(orders, user?.email);
@@ -538,11 +554,20 @@ export function ProfileModal({
                     {orders.map((order) => {
                       const isConfirmed =
                         order.status === 'Approved' || order.status === 'Completed';
+                      const isCancelled = order.status === 'Cancelled';
+                      const holdProgress = getSecurityHoldProgress(
+                        order.verifiedAtMs,
+                        order.unlockAtMs,
+                        nowMs,
+                        isConfirmed
+                      );
                       const statusLabel =
                         order.status === 'Completed'
                           ? 'Confirmed & Delivered'
                           : order.status === 'Approved'
                           ? 'Confirmed by Admin'
+                          : order.status === 'Waiting' && holdProgress.isComplete
+                          ? 'Hold Complete · Ready'
                           : order.status === 'Waiting'
                           ? 'Waiting (15-Day Hold)'
                           : order.status === 'Cancelled'
@@ -551,44 +576,86 @@ export function ProfileModal({
                       return (
                         <div
                           key={order.id}
-                          className={`rounded-lg bg-[#0D1117] border p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
+                          className={`rounded-lg bg-[#0D1117] border p-3.5 space-y-2.5 text-xs ${
                             isConfirmed ? 'border-emerald-500/35' : 'border-white/[0.08]'
                           }`}
                         >
-                          <div>
-                            <div className="font-semibold text-zinc-100">
-                              {order.packageTitle} · <span className="font-mono text-amber-300">{order.orderNumber}</span>
-                            </div>
-                            <div className="text-zinc-400 mt-0.5">
-                              {order.paymentMethod} · Account: {order.robloxUsername || 'Guest Payout'}
-                            </div>
-                            {isConfirmed && (
-                              <div className="text-[11px] text-emerald-300/90 mt-1">
-                                Confirmed by Admin
-                                {order.confirmedAt
-                                  ? ` · ${new Date(order.confirmedAt).toLocaleString()}`
-                                  : ''}
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="font-semibold text-zinc-100">
+                                {order.packageTitle} · <span className="font-mono text-amber-300">{order.orderNumber}</span>
                               </div>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="font-mono tabular-nums text-zinc-200">
-                              ৳{order.priceBdt} BDT
+                              <div className="text-zinc-400 mt-0.5">
+                                {order.paymentMethod} · Account: {order.robloxUsername || 'Guest Payout'}
+                              </div>
+                              {isConfirmed && (
+                                <div className="text-[11px] text-emerald-300/90 mt-1">
+                                  Confirmed by Admin
+                                  {order.confirmedAt
+                                    ? ` · ${new Date(order.confirmedAt).toLocaleString()}`
+                                    : ''}
+                                </div>
+                              )}
                             </div>
-                            <div
-                              className={`mt-0.5 font-semibold ${
-                                isConfirmed
-                                  ? 'text-emerald-400'
-                                  : order.status === 'Cancelled'
-                                  ? 'text-red-400'
-                                  : order.status === 'Waiting'
-                                  ? 'text-sky-300'
-                                  : 'text-amber-300'
-                              }`}
-                            >
-                              {statusLabel}
+                            <div className="text-right">
+                              <div className="font-mono tabular-nums text-zinc-200">
+                                ৳{order.priceBdt} BDT
+                              </div>
+                              <div
+                                className={`mt-0.5 font-semibold ${
+                                  isConfirmed || (order.status === 'Waiting' && holdProgress.isComplete)
+                                    ? 'text-emerald-400'
+                                    : isCancelled
+                                    ? 'text-red-400'
+                                    : order.status === 'Waiting'
+                                    ? 'text-sky-300'
+                                    : 'text-amber-300'
+                                }`}
+                              >
+                                {statusLabel}
+                              </div>
                             </div>
                           </div>
+
+                          {!isCancelled && holdProgress.hasHold && (
+                            <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+                              <div className="flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-zinc-400">
+                                  15-Day Hold ({holdProgress.dayLabel})
+                                </span>
+                                <span
+                                  className={`font-mono font-semibold tabular-nums ${
+                                    holdProgress.isComplete ? 'text-emerald-300' : 'text-amber-300'
+                                  }`}
+                                >
+                                  {holdProgress.percent}% · {holdProgress.countdownText}
+                                </span>
+                              </div>
+                              <div
+                                role="progressbar"
+                                aria-label="15-day security hold progress"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round(holdProgress.percent)}
+                                className="h-1.5 w-full rounded-full bg-[#131820] border border-white/10 overflow-hidden"
+                              >
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    holdProgress.isComplete
+                                      ? 'bg-emerald-400'
+                                      : 'bg-gradient-to-r from-amber-500 to-sky-400'
+                                  }`}
+                                  style={{
+                                    width: `${
+                                      holdProgress.isComplete
+                                        ? 100
+                                        : Math.max(3, holdProgress.percent)
+                                    }%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

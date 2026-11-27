@@ -2058,10 +2058,13 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as {
-        error?: string;
-        autoApprovedOrder?: string | null;
-      };
+      const contentType = res.headers.get('content-type') || '';
+      const data = contentType.includes('application/json')
+        ? ((await res.json().catch(() => ({}))) as {
+            error?: string;
+            autoApprovedOrder?: string | null;
+          })
+        : {};
       if (!res.ok) {
         return { ok: false, error: data.error || 'Could not save payment record.' };
       }
@@ -2440,7 +2443,7 @@ export default function App() {
         });
 
         const contentType = verifyRes.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
+        if (verifyRes.status !== 404 && contentType.includes('application/json')) {
           const verifyData = (await verifyRes.json()) as {
             valid?: boolean;
             verified?: boolean;

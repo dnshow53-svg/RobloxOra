@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -6,7 +7,11 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
-import { OrderRecord, normalizeOrderStatus } from '../data/packages';
+import {
+  OrderRecord,
+  getSecurityHoldProgress,
+  normalizeOrderStatus,
+} from '../data/packages';
 
 interface CustomerOrdersSectionProps {
   userEmail: string;
@@ -19,10 +24,26 @@ export function CustomerOrdersSection({
   orders,
   onRefresh,
 }: CustomerOrdersSectionProps) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
   const normalizedOrders = orders.map((o) => ({
     ...o,
     status: normalizeOrderStatus(o.status),
   }));
+
+  const hasActiveCountdown = normalizedOrders.some(
+    (o) =>
+      o.status !== 'Cancelled' &&
+      typeof o.unlockAtMs === 'number' &&
+      o.unlockAtMs > nowMs
+  );
+
+  useEffect(() => {
+    if (!hasActiveCountdown) return;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [hasActiveCountdown]);
 
   const confirmedOrders = normalizedOrders.filter(
     (o) => o.status === 'Approved' || o.status === 'Completed'
@@ -111,6 +132,15 @@ export function CustomerOrdersSection({
                 !isCancelled &&
                 Boolean(order.transactionId || order.status !== 'Pending');
 
+              const holdProgress = getSecurityHoldProgress(
+                order.verifiedAtMs,
+                order.unlockAtMs,
+                nowMs,
+                isConfirmed
+              );
+              const isWaitingAndReady =
+                order.status === 'Waiting' && holdProgress.hasHold && holdProgress.isComplete;
+
               const statusBadge =
                 order.status === 'Completed'
                   ? 'Confirmed & Delivered'
@@ -118,6 +148,8 @@ export function CustomerOrdersSection({
                   ? 'Confirmed by Admin'
                   : order.status === 'Cancelled'
                   ? 'Cancelled'
+                  : isWaitingAndReady
+                  ? 'Hold Complete · Ready to Pay'
                   : order.status === 'Waiting'
                   ? '15-Day Hold Active'
                   : 'Pending Admin Confirmation';
@@ -129,12 +161,19 @@ export function CustomerOrdersSection({
                   ? 'Admin confirmed your payment and approved your order for Robux payout.'
                   : order.status === 'Cancelled'
                   ? 'This order was cancelled. Contact support if you need help.'
+                  : isWaitingAndReady
+                  ? 'Your 15-day security hold is complete! Select a payment method above to submit your TrxID.'
                   : order.status === 'Waiting'
                   ? 'Waiting for your 15-day Roblox group hold timer to finish before submitting payment.'
                   : 'Your payment is submitted and awaiting Admin confirmation in the Admin Panel.';
 
               const steps = [
-                { label: '15-Day Hold', done: order.status !== 'Waiting' && !isCancelled },
+                {
+                  label: '15-Day Hold',
+                  done:
+                    !isCancelled &&
+                    (order.status !== 'Waiting' || isWaitingAndReady),
+                },
                 { label: 'Order Placed', done: hasPaid },
                 { label: 'Admin Confirmed', done: isConfirmed },
                 { label: 'Robux Delivered', done: isCompleted },
@@ -169,7 +208,7 @@ export function CustomerOrdersSection({
 
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold shrink-0 ${
-                        isConfirmed
+                        isConfirmed || isWaitingAndReady
                           ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
                           : isCancelled
                           ? 'bg-red-500/15 border-red-500/30 text-red-300'
@@ -178,7 +217,7 @@ export function CustomerOrdersSection({
                           : 'bg-amber-400/15 border-amber-400/30 text-amber-300'
                       }`}
                     >
-                      {isConfirmed ? (
+                      {isConfirmed || isWaitingAndReady ? (
                         <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       ) : isCancelled ? (
                         <XCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -197,6 +236,8 @@ export function CustomerOrdersSection({
                             className={`h-1.5 rounded-full transition-colors ${
                               step.done
                                 ? 'bg-emerald-400'
+                                : idx === 0 && order.status === 'Waiting'
+                                ? 'bg-sky-400/70'
                                 : idx === 2 && order.status === 'Pending'
                                 ? 'bg-amber-400/60'
                                 : 'bg-white/10'
@@ -204,13 +245,95 @@ export function CustomerOrdersSection({
                           />
                           <div
                             className={`text-[10px] font-medium truncate ${
-                              step.done ? 'text-emerald-300' : 'text-zinc-500'
+                              step.done
+                                ? 'text-emerald-300'
+                                : idx === 0 && order.status === 'Waiting'
+                                ? 'text-sky-300'
+                                : 'text-zinc-500'
                             }`}
                           >
                             {step.label}
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {!isCancelled && holdProgress.hasHold && (
+                    <div
+                      className={`rounded-lg border p-3.5 space-y-2.5 ${
+                        holdProgress.isComplete
+                          ? 'bg-emerald-500/[0.08] border-emerald-500/30'
+                          : 'bg-[#0D1117] border-amber-400/25'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span
+                          className={`inline-flex items-center gap-1.5 font-semibold ${
+                            holdProgress.isComplete ? 'text-emerald-300' : 'text-amber-300'
+                          }`}
+                        >
+                          {holdProgress.isComplete ? (
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          ) : (
+                            <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          )}
+                          <span>
+                            {holdProgress.isComplete
+                              ? '15-Day Security Hold Completed'
+                              : '15-Day Security Hold Progress'}
+                          </span>
+                        </span>
+                        <span
+                          className={`font-mono font-semibold tabular-nums ${
+                            holdProgress.isComplete ? 'text-emerald-300' : 'text-zinc-200'
+                          }`}
+                        >
+                          {holdProgress.percent}% · {holdProgress.countdownText}
+                        </span>
+                      </div>
+
+                      <div
+                        role="progressbar"
+                        aria-label="15-day security hold progress"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(holdProgress.percent)}
+                        className="relative h-2.5 w-full rounded-full bg-[#090B0E] border border-white/10 overflow-hidden"
+                      >
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            holdProgress.isComplete
+                              ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                              : 'bg-gradient-to-r from-amber-500 via-amber-400 to-sky-400'
+                          }`}
+                          style={{
+                            width: `${
+                              holdProgress.isComplete
+                                ? 100
+                                : Math.max(3, holdProgress.percent)
+                            }%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-400">
+                        <span>{holdProgress.dayLabel}</span>
+                        <span>
+                          {holdProgress.isComplete
+                            ? 'Unlocked · Ready for Payout'
+                            : `Unlocks ${holdProgress.unlockDateText}`}
+                        </span>
+                      </div>
+
+                      {isWaitingAndReady && (
+                        <a
+                          href="#verification"
+                          className="inline-flex min-h-[34px] w-full items-center justify-center rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-300 transition-colors"
+                        >
+                          Proceed to Payment Now
+                        </a>
+                      )}
                     </div>
                   )}
 

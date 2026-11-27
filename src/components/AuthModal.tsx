@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Lock, Shield, UserPlus, X } from 'lucide-react';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, RegisteredUser } from '../data/packages';
+import { ADMIN_EMAIL, RegisteredUser } from '../data/packages';
 
 export type AuthModalMode = 'signin' | 'signup' | 'admin';
 
@@ -42,6 +42,7 @@ export function AuthModal({
   // Admin fields
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -120,18 +121,33 @@ export function AuthModal({
     onClose();
   };
 
-  const handleAdminSubmit = (e: FormEvent) => {
+  const handleAdminSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmittingAdmin) return;
     const cleanEmail = adminEmail.trim().toLowerCase();
-    if (cleanEmail !== ADMIN_EMAIL.toLowerCase() || adminPassword !== ADMIN_PASSWORD) {
-      setError('Invalid Admin email or password.');
-      return;
-    }
+    setIsSubmittingAdmin(true);
     setError(null);
-    setAdminEmail('');
-    setAdminPassword('');
-    onAdminSignIn(ADMIN_EMAIL);
-    onClose();
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: adminPassword }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; email?: string; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        setError(data?.error || 'Invalid Admin email or password.');
+        return;
+      }
+      setError(null);
+      setAdminEmail('');
+      setAdminPassword('');
+      onAdminSignIn(data.email || ADMIN_EMAIL);
+      onClose();
+    } catch {
+      setError('Unable to reach server to verify admin credentials.');
+    } finally {
+      setIsSubmittingAdmin(false);
+    }
   };
 
   return (
@@ -386,9 +402,10 @@ export function AuthModal({
 
                   <button
                     type="submit"
-                    className="w-full min-h-[44px] rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white transition-colors"
+                    disabled={isSubmittingAdmin}
+                    className="w-full min-h-[44px] rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Sign In as Admin
+                    {isSubmittingAdmin ? 'Verifying...' : 'Sign In as Admin'}
                   </button>
 
                   <div className="text-center pt-1">

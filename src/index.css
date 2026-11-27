@@ -503,7 +503,7 @@ html.theme-light .hover\:border-white\/25:hover {
   border-color: rgba(15, 23, 42, 0.25);
 }
 
-html.theme-light .focus-visible:ring-offset-[#131820]:focus-visible {
+html.theme-light .focus-visible\:ring-offset-\[\#131820\]:focus-visible {
   --tw-ring-offset-color: #ffffff;
 }
 

@@ -107,7 +107,6 @@ export const ROBLOX_GROUP_URL =
   'https://www.roblox.com/communities/401717676/Velvet-Visions-Studio#!/about';
 
 export const ADMIN_EMAIL = 'dnshow53@gmail.com';
-export const ADMIN_PASSWORD = 'abdullah1029@#£';
 
 // 15 days in seconds (15 * 24 * 60 * 60 = 1,296,000)
 export const FIFTEEN_DAYS_SECONDS = 15 * 24 * 60 * 60;
@@ -320,4 +319,71 @@ export function calculateTierProgressPercent(totalSpendBdt: number): number {
     return 75 + ((spend - 10000) / (20570 - 10000)) * 25;
   }
   return 100;
+}
+
+export interface SecurityHoldProgress {
+  hasHold: boolean;
+  isComplete: boolean;
+  remainingSeconds: number;
+  percent: number;
+  countdownText: string;
+  dayLabel: string;
+  unlockDateText: string;
+}
+
+export function getSecurityHoldProgress(
+  verifiedAtMs?: number,
+  unlockAtMs?: number,
+  nowMs: number = Date.now(),
+  forceComplete = false
+): SecurityHoldProgress {
+  if (typeof unlockAtMs !== 'number' || unlockAtMs <= 0) {
+    return {
+      hasHold: false,
+      isComplete: false,
+      remainingSeconds: 0,
+      percent: 0,
+      countdownText: '',
+      dayLabel: '',
+      unlockDateText: '',
+    };
+  }
+
+  const totalMs =
+    typeof verifiedAtMs === 'number' &&
+    verifiedAtMs > 0 &&
+    unlockAtMs > verifiedAtMs
+      ? unlockAtMs - verifiedAtMs
+      : FIFTEEN_DAYS_SECONDS * 1000;
+
+  const remainingMs = forceComplete ? 0 : Math.max(0, unlockAtMs - nowMs);
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
+  const isComplete = forceComplete || remainingSeconds <= 0;
+  const elapsedMs = Math.max(0, totalMs - remainingMs);
+  const rawPercent = isComplete ? 100 : (elapsedMs / Math.max(1, totalMs)) * 100;
+  const percent = Math.min(100, Math.max(0, Number(rawPercent.toFixed(1))));
+
+  const totalDays = Math.max(1, Math.round(totalMs / 86400000));
+  const elapsedDays = isComplete
+    ? totalDays
+    : Math.min(totalDays, Math.floor(elapsedMs / 86400000) + 1);
+
+  const c = formatCountdown(remainingSeconds);
+  const countdownText = isComplete
+    ? 'Completed (Ready)'
+    : `${c.days}d ${c.hours}h ${c.minutes}m ${c.seconds}s left`;
+
+  return {
+    hasHold: true,
+    isComplete,
+    remainingSeconds,
+    percent,
+    countdownText,
+    dayLabel: isComplete ? `Day ${totalDays} of ${totalDays}` : `Day ${elapsedDays} of ${totalDays}`,
+    unlockDateText: new Date(unlockAtMs).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+  };
 }

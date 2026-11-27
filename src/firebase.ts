@@ -89,7 +89,7 @@ export function handleFirestoreError(
 
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDocFromServer(doc(db, 'storeSettings', 'group'));
   } catch (error) {
     if (
       error instanceof Error &&

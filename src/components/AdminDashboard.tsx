@@ -33,6 +33,7 @@ import {
   RobuxPackage,
   VerifiedPaymentRecord,
   formatCountdown,
+  getSecurityHoldProgress,
   normalizeOrderStatus,
 } from '../data/packages';
 
@@ -118,22 +119,32 @@ async function uploadProductPhoto(file: File): Promise<string> {
     });
   }
 
-  const res = await fetch('/api/uploads', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dataUrl }),
-  });
+  try {
+    const res = await fetch('/api/uploads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataUrl }),
+    });
 
-  if (!res.ok) {
-    const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(errBody.error || 'Failed to upload image.');
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
+      const data = (await res.json()) as { url?: string };
+      if (data.url) {
+        return data.url;
+      }
+    } else if (contentType.includes('application/json')) {
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 400 && errBody.error) {
+        throw new Error(errBody.error);
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Image')) {
+      throw err;
+    }
   }
 
-  const data = (await res.json()) as { url?: string };
-  if (!data.url) {
-    throw new Error('Server did not return an image URL.');
-  }
-  return data.url;
+  return dataUrl;
 }
 
 export function AdminDashboard({
@@ -1330,23 +1341,45 @@ export function AdminDashboard({
                           </span>
                         </div>
 
-                        {waitText && (
-                          <div
-                            className={`rounded-lg border px-3 py-2 flex items-center justify-between gap-2 font-mono tabular-nums ${
-                              isTimerReady
-                                ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300'
-                                : 'bg-[#131820] border-amber-400/30 text-amber-300'
-                            }`}
-                          >
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-sans font-medium">
-                              <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                              {isTimerReady ? 'Hold Completed' : '15-Day Timer'}
-                            </span>
-                            <span className="font-semibold text-[11px]">
-                              {isTimerReady ? 'Ready to Pay' : waitText}
-                            </span>
-                          </div>
-                        )}
+                        {waitText && (() => {
+                          const hold = getSecurityHoldProgress(
+                            order.verifiedAtMs,
+                            order.unlockAtMs,
+                            nowMs,
+                            order.status === 'Approved' || order.status === 'Completed'
+                          );
+                          return (
+                            <div
+                              className={`rounded-lg border p-3 space-y-2 font-mono tabular-nums ${
+                                isTimerReady
+                                  ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300'
+                                  : 'bg-[#131820] border-amber-400/30 text-amber-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="inline-flex items-center gap-1.5 text-[11px] font-sans font-medium">
+                                  <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  {isTimerReady ? 'Hold Completed' : `15-Day Timer (${hold.percent}%)`}
+                                </span>
+                                <span className="font-semibold text-[11px]">
+                                  {isTimerReady ? 'Ready to Pay' : waitText}
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full rounded-full bg-[#090B0E] border border-white/10 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isTimerReady
+                                      ? 'bg-emerald-400'
+                                      : 'bg-gradient-to-r from-amber-500 to-sky-400'
+                                  }`}
+                                  style={{
+                                    width: `${isTimerReady ? 100 : Math.max(3, hold.percent)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <div className="pt-2 border-t border-white/[0.06] space-y-1.5 text-zinc-300">
                           <div className="flex items-center gap-2.5 pb-1">
@@ -1504,18 +1537,38 @@ export function AdminDashboard({
                                   ID: {order.robloxUserId}
                                 </div>
                               )}
-                              {waitText && (
-                                <div
-                                  className={`mt-1 inline-flex items-center gap-1 font-mono text-[11px] tabular-nums ${
-                                    typeof order.unlockAtMs === 'number' && order.unlockAtMs <= nowMs
-                                      ? 'text-emerald-300'
-                                      : 'text-amber-300'
-                                  }`}
-                                >
-                                  <Clock className="w-3 h-3 shrink-0" aria-hidden="true" />
-                                  <span>{waitText}</span>
-                                </div>
-                              )}
+                              {waitText && (() => {
+                                const hold = getSecurityHoldProgress(
+                                  order.verifiedAtMs,
+                                  order.unlockAtMs,
+                                  nowMs,
+                                  order.status === 'Approved' || order.status === 'Completed'
+                                );
+                                return (
+                                  <div className="mt-1.5 space-y-1 max-w-[190px]">
+                                    <div
+                                      className={`inline-flex items-center gap-1 font-mono text-[11px] tabular-nums ${
+                                        hold.isComplete ? 'text-emerald-300' : 'text-amber-300'
+                                      }`}
+                                    >
+                                      <Clock className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                      <span>{waitText}</span>
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full bg-[#090B0E] border border-white/10 overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${
+                                          hold.isComplete
+                                            ? 'bg-emerald-400'
+                                            : 'bg-gradient-to-r from-amber-500 to-sky-400'
+                                        }`}
+                                        style={{
+                                          width: `${hold.isComplete ? 100 : Math.max(3, hold.percent)}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="py-3.5 pr-4 align-top">
                               <div className="font-medium">{order.packageTitle}</div>
