@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -3353,6 +3354,7 @@ export default function App() {
           </div>
         </div>
       )}
+      <Analytics />
     </div>
   );
 }
