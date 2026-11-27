@@ -220,12 +220,22 @@ export function AdminDashboard({
   const [liveRobuxError, setLiveRobuxError] = useState<string | null>(null);
   const [groupSavedNotice, setGroupSavedNotice] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [brokenAvatarUrls, setBrokenAvatarUrls] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setNowMs(Date.now());
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  const markAvatarBroken = (url: string) => {
+    setBrokenAvatarUrls((prev) => {
+      if (prev.has(url)) return prev;
+      const next = new Set(prev);
+      next.add(url);
+      return next;
+    });
+  };
 
   const normalizedOrders = useMemo(() => {
     return orders.map((ord) => ({
@@ -1340,10 +1350,11 @@ export function AdminDashboard({
 
                         <div className="pt-2 border-t border-white/[0.06] space-y-1.5 text-zinc-300">
                           <div className="flex items-center gap-2.5 pb-1">
-                            {customerAvatar ? (
+                            {customerAvatar && !brokenAvatarUrls.has(customerAvatar) ? (
                               <img
                                 src={customerAvatar}
                                 alt={order.userName}
+                                onError={() => markAvatarBroken(customerAvatar)}
                                 className="h-9 w-9 rounded-full object-cover border border-amber-400/50 shrink-0"
                               />
                             ) : (
@@ -1463,10 +1474,11 @@ export function AdminDashboard({
                             </td>
                             <td className="py-3.5 pr-4 align-top">
                               <div className="flex items-start gap-2.5">
-                                {customerAvatar ? (
+                                {customerAvatar && !brokenAvatarUrls.has(customerAvatar) ? (
                                   <img
                                     src={customerAvatar}
                                     alt={order.userName}
+                                    onError={() => markAvatarBroken(customerAvatar)}
                                     className="h-9 w-9 rounded-full object-cover border border-amber-400/50 shrink-0 mt-0.5"
                                   />
                                 ) : (

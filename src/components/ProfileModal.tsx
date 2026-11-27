@@ -37,34 +37,60 @@ interface ProfileModalProps {
 }
 
 async function compressAvatarFile(file: File): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Failed to read image file.'));
-    reader.readAsDataURL(file);
-  });
-
+  const objectUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
       el.onload = () => resolve(el);
       el.onerror = () => reject(new Error('Invalid image file.'));
-      el.src = dataUrl;
+      el.src = objectUrl;
     });
-    const maxDim = 400;
-    const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
-    const targetW = Math.max(1, Math.round((img.width || maxDim) * scale));
-    const targetH = Math.max(1, Math.round((img.height || maxDim) * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return dataUrl;
-    ctx.drawImage(img, 0, 0, targetW, targetH);
-    const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-    return canvas.toDataURL(outType, 0.85);
-  } catch {
-    return dataUrl;
+
+    const sourceW = img.naturalWidth || img.width;
+    const sourceH = img.naturalHeight || img.height;
+    if (!sourceW || !sourceH) {
+      throw new Error('Invalid image dimensions.');
+    }
+
+    const renderScaled = (maxDim: number, mime: string, quality: number): string => {
+      const scale = Math.min(1, maxDim / Math.max(sourceW, sourceH));
+      const targetW = Math.max(1, Math.round(sourceW * scale));
+      const targetH = Math.max(1, Math.round(sourceH * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas unavailable.');
+      if (mime === 'image/jpeg') {
+        ctx.fillStyle = '#131820';
+        ctx.fillRect(0, 0, targetW, targetH);
+      }
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      return canvas.toDataURL(mime, quality);
+    };
+
+    // Prefer WebP for transparent/sharp small avatars when supported, else JPEG
+    const webpAttempt = renderScaled(256, 'image/webp', 0.84);
+    if (webpAttempt.startsWith('data:image/webp') && webpAttempt.length <= 90_000) {
+      return webpAttempt;
+    }
+
+    const attempts: Array<[number, number]> = [
+      [256, 0.82],
+      [256, 0.68],
+      [192, 0.72],
+      [160, 0.62],
+    ];
+    for (const [dim, quality] of attempts) {
+      const jpegUrl = renderScaled(dim, 'image/jpeg', quality);
+      if (jpegUrl.startsWith('data:image/jpeg') && jpegUrl.length <= 95_000) {
+        return jpegUrl;
+      }
+    }
+
+    return renderScaled(128, 'image/jpeg', 0.6);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
   }
 }
 
@@ -82,6 +108,7 @@ export function ProfileModal({
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [avatar, setAvatar] = useState('');
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
@@ -111,11 +138,16 @@ export function ProfileModal({
       setPhone(user.phone);
       setPassword(user.password);
       setAvatar(user.avatar || '');
+      setAvatarLoadFailed(false);
       setAvatarError(null);
       setSavedNotice(null);
       setFormError(null);
     }
   }, [isOpen, user?.id]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatar]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -140,23 +172,10 @@ export function ProfileModal({
     setIsUploadingAvatar(true);
 
     try {
-      const compressedDataUrl = await compressAvatarFile(file);
-      let finalUrl = compressedDataUrl;
+      // Save as a compact self-contained Data URL so it never breaks on ephemeral /uploads resets
+      const finalUrl = await compressAvatarFile(file);
 
-      try {
-        const res = await fetch('/api/uploads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dataUrl: compressedDataUrl }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { url?: string };
-          if (data.url) finalUrl = data.url;
-        }
-      } catch {
-        // Fallback to local compressed dataUrl if server upload fails
-      }
-
+      setAvatarLoadFailed(false);
       setAvatar(finalUrl);
       onSaveProfile({
         ...user,
@@ -241,10 +260,11 @@ export function ProfileModal({
           >
             <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
               <div className="flex items-center gap-3">
-                {avatar ? (
+                {avatar && !avatarLoadFailed ? (
                   <img
                     src={avatar}
                     alt={name || user.name}
+                    onError={() => setAvatarLoadFailed(true)}
                     className="h-10 w-10 rounded-full object-cover border border-amber-400/40 shrink-0"
                   />
                 ) : (
@@ -274,10 +294,11 @@ export function ProfileModal({
                 {/* Profile Picture Uploader */}
                 <div className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-4 flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
-                    {avatar ? (
+                    {avatar && !avatarLoadFailed ? (
                       <img
                         src={avatar}
                         alt={name || user.name}
+                        onError={() => setAvatarLoadFailed(true)}
                         className="h-14 w-14 rounded-full object-cover border-2 border-amber-400/50 shrink-0"
                       />
                     ) : (

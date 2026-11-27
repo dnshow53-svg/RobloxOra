@@ -186,6 +186,7 @@ export default function App() {
 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [headerAvatarBroken, setHeaderAvatarBroken] = useState(false);
 
   // Global interactive animations on every button & clickable element
   useEffect(() => {
@@ -302,6 +303,10 @@ export default function App() {
     );
   }, [session, users]);
 
+  useEffect(() => {
+    setHeaderAvatarBroken(false);
+  }, [currentUser?.avatar]);
+
   const currentUserSpend = useMemo(() => {
     const userEmail = currentUser ? currentUser.email : session?.email;
     return calculateUserTotalSpend(orders, userEmail);
@@ -358,6 +363,8 @@ export default function App() {
   packagesRef.current = packages;
   const ordersRef = useRef(orders);
   ordersRef.current = orders;
+  const usersRef = useRef(users);
+  usersRef.current = users;
   const groupSettingsRef = useRef(groupSettings);
   groupSettingsRef.current = groupSettings;
   const latestGroupSettingsTsRef = useRef<number>(groupSettings.updatedAtMs ?? 0);
@@ -372,6 +379,218 @@ export default function App() {
   const inFlightUserIdsRef = useRef<Set<string>>(new Set());
   const syncEpochRef = useRef(0);
   const cloudOrderIdsRef = useRef<Set<string>>(new Set());
+  const isSwitchingUsernameRef = useRef(false);
+
+  const persistUserVerificationTimer = useCallback(
+    (
+      targetSession: SessionState,
+      nextTimer: VerificationTimerState,
+      options?: { tombstoneLeftUsername?: string }
+    ) => {
+      if (!targetSession || targetSession.role !== 'user') return;
+      const emailLower = targetSession.email.toLowerCase();
+      const matched = usersRef.current.find(
+        (u) => u.email.toLowerCase() === emailLower
+      );
+      if (!matched) return;
+
+      const updatedAtMs = Date.now();
+      const nextMap: Record<string, VerificationTimerState> = {
+        ...(matched.verifiedRobloxTimers || {}),
+      };
+      if (matched.verificationTimer?.isGroupVerified && matched.verificationTimer.robloxUsername.trim()) {
+        const prevKey = matched.verificationTimer.robloxUsername.trim().toLowerCase();
+        if (!nextMap[prevKey]) {
+          nextMap[prevKey] = matched.verificationTimer;
+        }
+      }
+      if (options?.tombstoneLeftUsername) {
+        const leftKey = options.tombstoneLeftUsername.trim().toLowerCase();
+        if (leftKey) {
+          nextMap[leftKey] = {
+            ...EMPTY_TIMER_STATE,
+            hasClickedGroupLink: nextTimer.hasClickedGroupLink,
+            robloxUsername: options.tombstoneLeftUsername.trim(),
+            robloxUserId: null,
+            verifiedAtMs: updatedAtMs,
+            unlockAtMs: 0,
+            isGroupVerified: false,
+          };
+        }
+      } else if (nextTimer.isGroupVerified && nextTimer.robloxUsername.trim()) {
+        const key = nextTimer.robloxUsername.trim().toLowerCase();
+        nextMap[key] = nextTimer;
+      }
+
+      const updatedUser: RegisteredUser = {
+        ...matched,
+        verificationTimer: nextTimer,
+        verifiedRobloxTimers: nextMap,
+        updatedAtMs,
+      };
+
+      inFlightUserIdsRef.current.add(updatedUser.id);
+      const nextUsers = usersRef.current.map((u) =>
+        u.id === updatedUser.id ? updatedUser : u
+      );
+      setUsers(nextUsers);
+      saveUsers(nextUsers);
+
+      void fetch(`/api/users/${encodeURIComponent(updatedUser.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          password: updatedUser.password,
+          avatar: updatedUser.avatar ?? '',
+          verificationTimer: nextTimer,
+          verifiedRobloxTimers: nextMap,
+          updatedAtMs,
+        }),
+      })
+        .catch(() => {})
+        .finally(() => {
+          inFlightUserIdsRef.current.delete(updatedUser.id);
+        });
+    },
+    []
+  );
+
+  const savedVerifiedTimers = useMemo(() => {
+    if (!session || session.role !== 'user') return [] as VerificationTimerState[];
+    const byKey = new Map<string, VerificationTimerState>();
+    const tombstoneTimestamps = new Map<string, number>();
+
+    if (currentUser?.verifiedRobloxTimers) {
+      for (const [k, entry] of Object.entries(currentUser.verifiedRobloxTimers)) {
+        const key = (entry.robloxUsername || k).trim().toLowerCase();
+        if (!key) continue;
+        if (!entry.isGroupVerified) {
+          tombstoneTimestamps.set(key, entry.verifiedAtMs || Date.now());
+          continue;
+        }
+        if (entry.verifiedAtMs > 0) {
+          byKey.set(key, entry);
+        }
+      }
+    }
+
+    if (
+      currentUser?.verificationTimer?.isGroupVerified &&
+      currentUser.verificationTimer.verifiedAtMs > 0 &&
+      currentUser.verificationTimer.robloxUsername.trim()
+    ) {
+      const key = currentUser.verificationTimer.robloxUsername.trim().toLowerCase();
+      if (!tombstoneTimestamps.has(key) && !byKey.has(key)) {
+        byKey.set(key, currentUser.verificationTimer);
+      }
+    }
+
+    for (const ord of userOrders) {
+      if (
+        ord.status === 'Cancelled' ||
+        typeof ord.verifiedAtMs !== 'number' ||
+        ord.verifiedAtMs <= 0 ||
+        typeof ord.unlockAtMs !== 'number' ||
+        ord.unlockAtMs <= 0
+      ) {
+        continue;
+      }
+      const cleanName = (ord.robloxUsername || '').trim();
+      if (
+        !cleanName ||
+        cleanName === 'Verified Member' ||
+        cleanName === 'Admin Test' ||
+        cleanName === 'Admin Override'
+      ) {
+        continue;
+      }
+      const key = cleanName.toLowerCase();
+      const leftAt = tombstoneTimestamps.get(key) || 0;
+      if (leftAt > 0 && ord.verifiedAtMs <= leftAt) continue;
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          hasClickedGroupLink: true,
+          isGroupVerified: true,
+          verifiedAtMs: ord.verifiedAtMs,
+          unlockAtMs: ord.unlockAtMs,
+          robloxUsername: cleanName,
+          robloxUserId: ord.robloxUserId ?? null,
+        });
+      }
+    }
+
+    return Array.from(byKey.values()).sort((a, b) => a.unlockAtMs - b.unlockAtMs);
+  }, [session, currentUser, userOrders]);
+
+  const findSavedTimerForRobloxAccount = useCallback(
+    (username: string, userId: number | null): VerificationTimerState | null => {
+      const cleanKey = username.trim().toLowerCase();
+      if (!cleanKey) return null;
+
+      // If this username was explicitly marked as having left the group, never reuse old timers
+      const directMapEntry = currentUser?.verifiedRobloxTimers?.[cleanKey];
+      if (directMapEntry && !directMapEntry.isGroupVerified) {
+        return null;
+      }
+
+      if (currentUser?.verifiedRobloxTimers) {
+        for (const entry of Object.values(currentUser.verifiedRobloxTimers)) {
+          if (!entry.isGroupVerified || entry.verifiedAtMs <= 0) continue;
+          if (
+            (userId !== null && entry.robloxUserId === userId) ||
+            entry.robloxUsername.trim().toLowerCase() === cleanKey
+          ) {
+            return entry;
+          }
+        }
+      }
+
+      const activeSaved = currentUser?.verificationTimer;
+      if (
+        activeSaved?.isGroupVerified &&
+        activeSaved.verifiedAtMs > 0 &&
+        ((userId !== null && activeSaved.robloxUserId === userId) ||
+          activeSaved.robloxUsername.trim().toLowerCase() === cleanKey)
+      ) {
+        return activeSaved;
+      }
+
+      const matchingOrder = userOrders.find((o) => {
+        if (
+          o.status === 'Cancelled' ||
+          typeof o.verifiedAtMs !== 'number' ||
+          o.verifiedAtMs <= 0 ||
+          typeof o.unlockAtMs !== 'number' ||
+          o.unlockAtMs <= 0
+        ) {
+          return false;
+        }
+        const leftAt = directMapEntry && !directMapEntry.isGroupVerified ? directMapEntry.verifiedAtMs : 0;
+        if (leftAt > 0 && o.verifiedAtMs <= leftAt) return false;
+        return (
+          (userId !== null && o.robloxUserId === userId) ||
+          o.robloxUsername.trim().toLowerCase() === cleanKey
+        );
+      });
+
+      if (matchingOrder && matchingOrder.verifiedAtMs && matchingOrder.unlockAtMs) {
+        return {
+          hasClickedGroupLink: true,
+          isGroupVerified: true,
+          verifiedAtMs: matchingOrder.verifiedAtMs,
+          unlockAtMs: matchingOrder.unlockAtMs,
+          robloxUsername: matchingOrder.robloxUsername.trim() || username.trim(),
+          robloxUserId: matchingOrder.robloxUserId ?? userId,
+        };
+      }
+
+      return null;
+    },
+    [currentUser, userOrders]
+  );
 
   const updateTimerState = useCallback(
     (updater: (prev: VerificationTimerState) => VerificationTimerState) => {
@@ -528,6 +747,12 @@ export default function App() {
       if (!targetState.isGroupVerified || !targetState.robloxUsername.trim()) {
         return false;
       }
+      if (
+        targetState.robloxUserId === null &&
+        targetState.robloxUsername.trim() === 'Admin Override'
+      ) {
+        return true;
+      }
       if (isCheckingUnjoinRef.current) return true;
       isCheckingUnjoinRef.current = true;
 
@@ -544,6 +769,7 @@ export default function App() {
               if (!prev.isGroupVerified) return prev;
               const updated = { ...prev, robloxUserId: outcome.userId };
               saveTimerState(sessionRef.current, updated);
+              persistUserVerificationTimer(sessionRef.current, updated);
               return updated;
             });
           }
@@ -559,6 +785,9 @@ export default function App() {
           };
           setTimerState(reset);
           saveTimerState(sessionRef.current, reset);
+          persistUserVerificationTimer(sessionRef.current, reset, {
+            tombstoneLeftUsername: targetState.robloxUsername,
+          });
           setRemainingSeconds(FIFTEEN_DAYS_SECONDS);
           setSelectedPaymentId(null);
           setOrderReceipt(null);
@@ -571,7 +800,7 @@ export default function App() {
         isCheckingUnjoinRef.current = false;
       }
     },
-    [cancelWaitingOrderForTimer]
+    [cancelWaitingOrderForTimer, persistUserVerificationTimer]
   );
 
   // Reload scoped timer when active user identity or target group changes + backfill Waiting order
@@ -586,6 +815,55 @@ export default function App() {
       return;
     }
     let nextTimer = loadTimerState(activeSession);
+    const matchedUser = usersRef.current.find(
+      (u) => u.email.toLowerCase() === activeSession.email.toLowerCase()
+    );
+    const serverTimer = matchedUser?.verificationTimer;
+
+    if (
+      !nextTimer.isGroupVerified &&
+      serverTimer?.isGroupVerified &&
+      serverTimer.verifiedAtMs > 0
+    ) {
+      nextTimer = { ...serverTimer };
+      saveTimerState(activeSession, nextTimer);
+    } else if (
+      nextTimer.isGroupVerified &&
+      serverTimer?.isGroupVerified &&
+      serverTimer.verifiedAtMs === nextTimer.verifiedAtMs &&
+      serverTimer.unlockAtMs < nextTimer.unlockAtMs
+    ) {
+      nextTimer = {
+        ...nextTimer,
+        unlockAtMs: serverTimer.unlockAtMs,
+      };
+      saveTimerState(activeSession, nextTimer);
+    } else if (!nextTimer.isGroupVerified && serverTimer === undefined) {
+      const recoverableOrder = ordersRef.current.find(
+        (o) =>
+          o.userEmail.toLowerCase() === activeSession.email.toLowerCase() &&
+          o.status !== 'Cancelled' &&
+          typeof o.verifiedAtMs === 'number' &&
+          o.verifiedAtMs > 0 &&
+          typeof o.unlockAtMs === 'number' &&
+          o.unlockAtMs > 0
+      );
+      if (recoverableOrder && recoverableOrder.verifiedAtMs && recoverableOrder.unlockAtMs) {
+        nextTimer = {
+          hasClickedGroupLink: true,
+          isGroupVerified: true,
+          verifiedAtMs: recoverableOrder.verifiedAtMs,
+          unlockAtMs: recoverableOrder.unlockAtMs,
+          robloxUsername: recoverableOrder.robloxUsername || 'Verified Member',
+          robloxUserId: recoverableOrder.robloxUserId ?? null,
+        };
+        saveTimerState(activeSession, nextTimer);
+        persistUserVerificationTimer(activeSession, nextTimer);
+      }
+    } else if (nextTimer.isGroupVerified && !serverTimer) {
+      persistUserVerificationTimer(activeSession, nextTimer);
+    }
+
     if (
       nextTimer.isGroupVerified &&
       nextTimer.verifiedAtMs > 0 &&
@@ -596,6 +874,7 @@ export default function App() {
         unlockAtMs: nextTimer.verifiedAtMs + FIFTEEN_DAYS_SECONDS * 1000,
       };
       saveTimerState(activeSession, nextTimer);
+      persistUserVerificationTimer(activeSession, nextTimer);
     }
     setTimerState(nextTimer);
     if (nextTimer.isGroupVerified) {
@@ -610,7 +889,12 @@ export default function App() {
         } catch {
           alreadySynced = false;
         }
-        if (!alreadySynced) {
+        const alreadyHasOrder = ordersRef.current.some(
+          (o) =>
+            o.userEmail.toLowerCase() === activeSession.email.toLowerCase() &&
+            o.verifiedAtMs === nextTimer.verifiedAtMs
+        );
+        if (!alreadySynced && !alreadyHasOrder && nextTimer.unlockAtMs > Date.now()) {
           void registerWaitingOrder(nextTimer);
         }
       }
@@ -620,7 +904,13 @@ export default function App() {
     }
     setErrorMessage(null);
     setOrderReceipt(null);
-  }, [sessionKey, groupSettings.groupId, verifyStillMemberInBackground, registerWaitingOrder]);
+  }, [
+    sessionKey,
+    groupSettings.groupId,
+    verifyStillMemberInBackground,
+    registerWaitingOrder,
+    persistUserVerificationTimer,
+  ]);
 
   // Continuous live unjoin detection: poll every 15s + re-check immediately on tab visibility/focus
   const timerStateRef = useRef(timerState);
@@ -741,12 +1031,23 @@ export default function App() {
         if (
           isInFlight ||
           localTs > serverTs ||
-          (localTs === serverTs && Boolean(lu.avatar) && !su.avatar)
+          (localTs === serverTs &&
+            Boolean(lu.avatar) &&
+            !lu.avatar?.startsWith('/uploads/') &&
+            !su.avatar)
         ) {
+          const mergedTimersMap =
+            su.verifiedRobloxTimers || lu.verifiedRobloxTimers
+              ? {
+                  ...(su.verifiedRobloxTimers || {}),
+                  ...(lu.verifiedRobloxTimers || {}),
+                }
+              : undefined;
           const mergedLocal: RegisteredUser = {
             ...su,
             ...lu,
             id: su.id,
+            verifiedRobloxTimers: mergedTimersMap,
             updatedAtMs: Math.max(localTs, serverTs),
           };
           userByEmail.set(key, mergedLocal);
@@ -766,9 +1067,30 @@ export default function App() {
             phone: uPush.phone,
             password: uPush.password,
             avatar: uPush.avatar ?? '',
+            verificationTimer: uPush.verificationTimer,
+            verifiedRobloxTimers: uPush.verifiedRobloxTimers,
             updatedAtMs: uPush.updatedAtMs ?? Date.now(),
           }),
         }).catch(() => {});
+      }
+
+      // Preserve any profile/avatar edits made while async fetches above were in flight
+      const latestLocalUsers = loadUsers();
+      for (const llu of latestLocalUsers) {
+        const key = llu.email.toLowerCase();
+        const existingMerged = userByEmail.get(key);
+        if (
+          !existingMerged ||
+          inFlightUserIdsRef.current.has(llu.id) ||
+          inFlightUserIdsRef.current.has(existingMerged.id) ||
+          (llu.updatedAtMs || 0) > (existingMerged.updatedAtMs || 0)
+        ) {
+          userByEmail.set(key, {
+            ...(existingMerged || llu),
+            ...llu,
+            id: existingMerged?.id || llu.id,
+          });
+        }
       }
 
       const syncedUsers = Array.from(userByEmail.values());
@@ -933,28 +1255,83 @@ export default function App() {
         }
       }
 
-      // Sync Admin remote "Unlock Timer" back to the active customer's timer live
+      // Sync verified/unlocked 15-day timer state both from server user record and Admin remote unlocks
       const activeSession = sessionRef.current;
       const currentTs = timerStateRef.current;
-      if (activeSession && currentTs.isGroupVerified && currentTs.verifiedAtMs) {
-        const matchedSrv = sortedOrders.find(
-          (o) =>
-            o.userEmail.toLowerCase() === activeSession.email.toLowerCase() &&
-            o.verifiedAtMs === currentTs.verifiedAtMs
+      if (activeSession) {
+        const syncedActiveUser = syncedUsers.find(
+          (u) => u.email.toLowerCase() === activeSession.email.toLowerCase()
         );
-        if (
-          matchedSrv &&
-          typeof matchedSrv.unlockAtMs === 'number' &&
-          matchedSrv.unlockAtMs <= Date.now() &&
-          currentTs.unlockAtMs > Date.now()
-        ) {
-          const unlockedState: VerificationTimerState = {
-            ...currentTs,
-            unlockAtMs: matchedSrv.unlockAtMs,
-          };
-          setTimerState(unlockedState);
-          saveTimerState(activeSession, unlockedState);
-          setRemainingSeconds(0);
+        const srvTimer = syncedActiveUser?.verificationTimer;
+
+        if (!currentTs.isGroupVerified && !isSwitchingUsernameRef.current) {
+          if (srvTimer?.isGroupVerified && srvTimer.verifiedAtMs > 0) {
+            setTimerState(srvTimer);
+            saveTimerState(activeSession, srvTimer);
+            setRemainingSeconds(
+              Math.max(0, Math.ceil((srvTimer.unlockAtMs - Date.now()) / 1000))
+            );
+          } else if (srvTimer === undefined) {
+            const recoverableOrder = sortedOrders.find(
+              (o) =>
+                o.userEmail.toLowerCase() === activeSession.email.toLowerCase() &&
+                o.status !== 'Cancelled' &&
+                typeof o.verifiedAtMs === 'number' &&
+                o.verifiedAtMs > 0 &&
+                typeof o.unlockAtMs === 'number' &&
+                o.unlockAtMs > 0
+            );
+            if (recoverableOrder && recoverableOrder.verifiedAtMs && recoverableOrder.unlockAtMs) {
+              const recovered: VerificationTimerState = {
+                hasClickedGroupLink: true,
+                isGroupVerified: true,
+                verifiedAtMs: recoverableOrder.verifiedAtMs,
+                unlockAtMs: recoverableOrder.unlockAtMs,
+                robloxUsername: recoverableOrder.robloxUsername || 'Verified Member',
+                robloxUserId: recoverableOrder.robloxUserId ?? null,
+              };
+              setTimerState(recovered);
+              saveTimerState(activeSession, recovered);
+              persistUserVerificationTimer(activeSession, recovered);
+              setRemainingSeconds(
+                Math.max(0, Math.ceil((recovered.unlockAtMs - Date.now()) / 1000))
+              );
+            }
+          }
+        } else if (currentTs.verifiedAtMs) {
+          const mapTimer =
+            syncedActiveUser?.verifiedRobloxTimers?.[
+              currentTs.robloxUsername.trim().toLowerCase()
+            ];
+          const matchedSrv = sortedOrders.find(
+            (o) =>
+              o.userEmail.toLowerCase() === activeSession.email.toLowerCase() &&
+              o.verifiedAtMs === currentTs.verifiedAtMs
+          );
+          const remoteUnlockMs =
+            matchedSrv &&
+            typeof matchedSrv.unlockAtMs === 'number' &&
+            matchedSrv.unlockAtMs <= Date.now()
+              ? matchedSrv.unlockAtMs
+              : mapTimer?.isGroupVerified &&
+                mapTimer.verifiedAtMs === currentTs.verifiedAtMs &&
+                mapTimer.unlockAtMs <= Date.now()
+              ? mapTimer.unlockAtMs
+              : srvTimer?.isGroupVerified &&
+                srvTimer.verifiedAtMs === currentTs.verifiedAtMs &&
+                srvTimer.unlockAtMs <= Date.now()
+              ? srvTimer.unlockAtMs
+              : null;
+          if (remoteUnlockMs !== null && currentTs.unlockAtMs > Date.now()) {
+            const unlockedState: VerificationTimerState = {
+              ...currentTs,
+              unlockAtMs: remoteUnlockMs,
+            };
+            setTimerState(unlockedState);
+            saveTimerState(activeSession, unlockedState);
+            persistUserVerificationTimer(activeSession, unlockedState);
+            setRemainingSeconds(0);
+          }
         }
       }
 
@@ -1270,6 +1647,7 @@ export default function App() {
   };
 
   const handleSignOut = () => {
+    isSwitchingUsernameRef.current = false;
     setSession(null);
     saveSession(null);
     setTimerState({ ...EMPTY_TIMER_STATE });
@@ -1285,6 +1663,10 @@ export default function App() {
     const previousEmail = currentUser?.email;
     const stamped: RegisteredUser = {
       ...updated,
+      verificationTimer:
+        updated.verificationTimer ??
+        (timerState.isGroupVerified ? timerState : undefined),
+      verifiedRobloxTimers: updated.verifiedRobloxTimers ?? currentUser?.verifiedRobloxTimers,
       updatedAtMs: Date.now(),
     };
 
@@ -1301,6 +1683,13 @@ export default function App() {
     });
 
     const nextSession: SessionState = { role: 'user', email: stamped.email };
+    if (
+      previousEmail &&
+      previousEmail.toLowerCase() !== stamped.email.toLowerCase() &&
+      timerState.isGroupVerified
+    ) {
+      saveTimerState(nextSession, timerState);
+    }
     setSession(nextSession);
     saveSession(nextSession);
 
@@ -1315,6 +1704,8 @@ export default function App() {
             phone: stamped.phone,
             password: stamped.password,
             avatar: stamped.avatar ?? '',
+            verificationTimer: stamped.verificationTimer,
+            verifiedRobloxTimers: stamped.verifiedRobloxTimers,
             updatedAtMs: stamped.updatedAtMs,
           }),
         });
@@ -1534,6 +1925,59 @@ export default function App() {
     );
     setOrders(next);
     saveOrders(next);
+
+    // Also mark that customer's saved verificationTimer unlocked so future orders require no timer
+    if (existingOrder?.userEmail) {
+      const emailLower = existingOrder.userEmail.toLowerCase();
+      const targetUser = usersRef.current.find(
+        (u) => u.email.toLowerCase() === emailLower
+      );
+      if (targetUser) {
+        const resolvedUsername =
+          existingOrder.robloxUsername || targetUser.verificationTimer?.robloxUsername || 'Verified Member';
+        const nextUserTimer: VerificationTimerState = {
+          hasClickedGroupLink: true,
+          isGroupVerified: true,
+          verifiedAtMs: existingOrder.verifiedAtMs || targetUser.verificationTimer?.verifiedAtMs || nowMs,
+          unlockAtMs: nowMs,
+          robloxUsername: resolvedUsername,
+          robloxUserId: existingOrder.robloxUserId ?? targetUser.verificationTimer?.robloxUserId ?? null,
+        };
+        const nextMap: Record<string, VerificationTimerState> = {
+          ...(targetUser.verifiedRobloxTimers || {}),
+        };
+        if (resolvedUsername.trim()) {
+          nextMap[resolvedUsername.trim().toLowerCase()] = nextUserTimer;
+        }
+        const updatedAtMs = Date.now();
+        const updatedUser: RegisteredUser = {
+          ...targetUser,
+          verificationTimer: nextUserTimer,
+          verifiedRobloxTimers: nextMap,
+          updatedAtMs,
+        };
+        const nextUsers = usersRef.current.map((u) =>
+          u.id === updatedUser.id ? updatedUser : u
+        );
+        setUsers(nextUsers);
+        saveUsers(nextUsers);
+        void fetch(`/api/users/${encodeURIComponent(updatedUser.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: updatedUser.name,
+            email: updatedUser.email,
+            phone: updatedUser.phone,
+            password: updatedUser.password,
+            avatar: updatedUser.avatar ?? '',
+            verificationTimer: nextUserTimer,
+            verifiedRobloxTimers: nextMap,
+            updatedAtMs,
+          }),
+        }).catch(() => {});
+      }
+    }
+
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
@@ -1761,40 +2205,89 @@ export default function App() {
         setErrorMessage('Please enter a valid Roblox username (at least 3 characters).');
         return;
       }
+      const existingCompletedTimer = findSavedTimerForRobloxAccount(cleanName, null);
       const nowMs = Date.now();
-      const unlockAtMs = nowMs + FIFTEEN_DAYS_SECONDS * 1000;
+      const verifiedAtMs = existingCompletedTimer?.verifiedAtMs || nowMs;
+      const unlockAtMs =
+        existingCompletedTimer?.unlockAtMs ?? nowMs + FIFTEEN_DAYS_SECONDS * 1000;
       const nextTimer: VerificationTimerState = {
         hasClickedGroupLink: true,
         isGroupVerified: true,
-        verifiedAtMs: nowMs,
+        verifiedAtMs,
         unlockAtMs,
-        robloxUsername: cleanName,
-        robloxUserId: null,
+        robloxUsername: existingCompletedTimer?.robloxUsername || cleanName,
+        robloxUserId: existingCompletedTimer?.robloxUserId ?? null,
       };
+      isSwitchingUsernameRef.current = false;
       setErrorMessage(null);
-      setRemainingSeconds(FIFTEEN_DAYS_SECONDS);
+      setRemainingSeconds(Math.max(0, Math.ceil((unlockAtMs - nowMs) / 1000)));
       setTimerState(nextTimer);
       saveTimerState(session, nextTimer);
-      void registerWaitingOrder(nextTimer, selectedPackage);
+      persistUserVerificationTimer(session, nextTimer);
+      if (unlockAtMs > nowMs) {
+        void registerWaitingOrder(nextTimer, selectedPackage);
+      }
       return;
     }
 
-    // Verified Member -> save username, userId, join timestamp, start 15-day timer, and register Waiting order!
+    // Verified Member -> only reuse saved/completed timer if THIS exact Roblox account already verified/completed 15 days;
+    // any NEW Roblox username starts a fresh 15-day timer.
+    const existingSavedTimer = findSavedTimerForRobloxAccount(
+      outcome.username,
+      outcome.userId
+    );
     const nowMs = Date.now();
-    const unlockAtMs = nowMs + FIFTEEN_DAYS_SECONDS * 1000;
+    const verifiedAtMs = existingSavedTimer?.verifiedAtMs || nowMs;
+    const unlockAtMs =
+      existingSavedTimer?.unlockAtMs ?? nowMs + FIFTEEN_DAYS_SECONDS * 1000;
     const nextTimer: VerificationTimerState = {
       hasClickedGroupLink: true,
       isGroupVerified: true,
-      verifiedAtMs: nowMs,
+      verifiedAtMs,
       unlockAtMs,
       robloxUsername: outcome.username,
       robloxUserId: outcome.userId,
     };
+    isSwitchingUsernameRef.current = false;
     setErrorMessage(null);
-    setRemainingSeconds(FIFTEEN_DAYS_SECONDS);
+    setRemainingSeconds(Math.max(0, Math.ceil((unlockAtMs - nowMs) / 1000)));
     setTimerState(nextTimer);
     saveTimerState(session, nextTimer);
-    void registerWaitingOrder(nextTimer, selectedPackage);
+    persistUserVerificationTimer(session, nextTimer);
+    if (unlockAtMs > nowMs) {
+      void registerWaitingOrder(nextTimer, selectedPackage);
+    }
+  };
+
+  const handleSwitchRobloxUsername = () => {
+    if (!session) return;
+    isSwitchingUsernameRef.current = true;
+    const switched: VerificationTimerState = {
+      ...EMPTY_TIMER_STATE,
+      hasClickedGroupLink: false,
+    };
+    setTimerState(switched);
+    saveTimerState(session, switched);
+    setRemainingSeconds(FIFTEEN_DAYS_SECONDS);
+    setErrorMessage(null);
+    setPaymentError(null);
+    setSelectedPaymentId(null);
+    setOrderReceipt(null);
+  };
+
+  const handleSelectSavedUsername = (saved: VerificationTimerState) => {
+    if (!session) return;
+    isSwitchingUsernameRef.current = false;
+    const nowMs = Date.now();
+    setErrorMessage(null);
+    setPaymentError(null);
+    setSelectedPaymentId(null);
+    setOrderReceipt(null);
+    setTimerState(saved);
+    saveTimerState(session, saved);
+    persistUserVerificationTimer(session, saved);
+    setRemainingSeconds(Math.max(0, Math.ceil((saved.unlockAtMs - nowMs) / 1000)));
+    void verifyStillMemberInBackground(saved, groupSettings.groupId);
   };
 
   const handleAdminUnlockTimer = () => {
@@ -1812,6 +2305,7 @@ export default function App() {
     setErrorMessage(null);
     setTimerState(unlocked);
     saveTimerState(session, unlocked);
+    persistUserVerificationTimer(session, unlocked);
     setRemainingSeconds(0);
 
     // Also update any matching Waiting order on server
@@ -1828,16 +2322,11 @@ export default function App() {
     }
   };
 
-  const handleResetVerification = () => {
-    void cancelWaitingOrderForTimer(timerState.verifiedAtMs);
+  const handleStartAnotherOrder = () => {
     setErrorMessage(null);
     setPaymentError(null);
     setSelectedPaymentId(null);
     setOrderReceipt(null);
-    setRemainingSeconds(FIFTEEN_DAYS_SECONDS);
-    const resetState = { ...EMPTY_TIMER_STATE };
-    setTimerState(resetState);
-    saveTimerState(session, resetState);
   };
 
   const handleCompleteOrder = async (transactionId: string) => {
@@ -2185,10 +2674,12 @@ export default function App() {
                 onClick={() => setIsProfileModalOpen(true)}
                 className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#131820] border border-white/15 px-3 py-2 text-xs font-semibold text-zinc-100 hover:border-amber-400/60 transition-colors whitespace-nowrap shrink-0"
               >
-                {currentUser.avatar ? (
+                {currentUser.avatar && !headerAvatarBroken ? (
                   <img
+                    key={currentUser.avatar}
                     src={currentUser.avatar}
                     alt={currentUser.name}
+                    onError={() => setHeaderAvatarBroken(true)}
                     className="w-5 h-5 rounded-full object-cover border border-amber-400/50 shrink-0"
                   />
                 ) : (
@@ -2589,6 +3080,7 @@ export default function App() {
               ? remainingSeconds
               : FIFTEEN_DAYS_SECONDS
           }
+          savedVerifiedTimers={savedVerifiedTimers}
           errorMessage={errorMessage}
           paymentError={paymentError}
           selectedPaymentId={selectedPaymentId}
@@ -2597,8 +3089,10 @@ export default function App() {
           onRequireSignIn={requireSignInPrompt}
           onGroupLinkClick={handleGroupLinkClick}
           onVerifyMembership={handleVerifyMembership}
+          onSwitchRobloxUsername={handleSwitchRobloxUsername}
+          onSelectSavedUsername={handleSelectSavedUsername}
           onAdminUnlockTimer={handleAdminUnlockTimer}
-          onResetVerification={handleResetVerification}
+          onStartAnotherOrder={handleStartAnotherOrder}
           onClearPaymentError={() => setPaymentError(null)}
           onSelectPayment={(id) => {
             setPaymentError(null);
@@ -2715,6 +3209,7 @@ export default function App() {
             ? remainingSeconds
             : FIFTEEN_DAYS_SECONDS
         }
+        savedVerifiedTimers={savedVerifiedTimers}
         errorMessage={errorMessage}
         paymentError={paymentError}
         selectedPaymentId={selectedPaymentId}
@@ -2723,8 +3218,9 @@ export default function App() {
         onRequireSignIn={requireSignInPrompt}
         onGroupLinkClick={handleGroupLinkClick}
         onVerifyMembership={handleVerifyMembership}
+        onSwitchRobloxUsername={handleSwitchRobloxUsername}
+        onSelectSavedUsername={handleSelectSavedUsername}
         onAdminUnlockTimer={handleAdminUnlockTimer}
-        onResetVerification={handleResetVerification}
         onClearPaymentError={() => setPaymentError(null)}
         onSelectPayment={(id) => {
           setPaymentError(null);

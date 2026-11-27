@@ -9,9 +9,9 @@ import {
   ExternalLink,
   Loader2,
   Lock,
-  RotateCcw,
   ShieldCheck,
   Sparkles,
+  UserPlus,
   X,
   Zap,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import {
   PAYMENT_LOCKED_MESSAGE,
   PAYMENT_OPTIONS,
   RobuxPackage,
+  VerificationTimerState,
   formatCountdown,
 } from '../data/packages';
 import { RestockCountdownCard } from './RestockCountdownCard';
@@ -39,6 +40,7 @@ interface VerificationModalProps {
   isVerifyingApi: boolean;
   isSubmittingOrder?: boolean;
   remainingSeconds: number;
+  savedVerifiedTimers?: VerificationTimerState[];
   errorMessage: string | null;
   paymentError?: string | null;
   selectedPaymentId: string | null;
@@ -52,8 +54,9 @@ interface VerificationModalProps {
   onRequireSignIn: () => void;
   onGroupLinkClick: () => void;
   onVerifyMembership: () => void;
+  onSwitchRobloxUsername: () => void;
+  onSelectSavedUsername: (saved: VerificationTimerState) => void;
   onAdminUnlockTimer: () => void;
-  onResetVerification: () => void;
   onClearPaymentError?: () => void;
   onSelectPayment: (id: string) => void;
   onShowOutOfStock?: () => void;
@@ -74,6 +77,7 @@ export function VerificationModal({
   isVerifyingApi,
   isSubmittingOrder = false,
   remainingSeconds,
+  savedVerifiedTimers = [],
   errorMessage,
   paymentError = null,
   selectedPaymentId,
@@ -82,8 +86,9 @@ export function VerificationModal({
   onRequireSignIn,
   onGroupLinkClick,
   onVerifyMembership,
+  onSwitchRobloxUsername,
+  onSelectSavedUsername,
   onAdminUnlockTimer,
-  onResetVerification,
   onClearPaymentError,
   onSelectPayment,
   onShowOutOfStock,
@@ -176,194 +181,260 @@ export function VerificationModal({
 
             {/* Body */}
             <div className="p-6 space-y-6">
-              <div className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-4">
-                <p className="text-sm font-medium text-zinc-100 leading-relaxed">
-                  You must join our official Roblox community group before purchasing.
-                </p>
-                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-                  Membership is verified against Group ID{' '}
-                  <span className="font-mono text-zinc-300">{groupSettings.groupId}</span>. Leaving the group automatically resets your 15-day timer.
-                </p>
-              </div>
-
-              {/* Step 1: Join Community */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-medium text-zinc-300">
-                    Step 1. Join our official Roblox community group
-                  </span>
-                  <span
-                    className={`text-xs font-medium flex items-center gap-1.5 ${
-                      hasClickedGroupLink ? 'text-emerald-400' : 'text-zinc-500'
-                    }`}
-                  >
-                    {hasClickedGroupLink ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                        Link Clicked
-                      </>
-                    ) : (
-                      'Not Clicked Yet'
-                    )}
-                  </span>
-                </div>
-
-                <a
-                  href={groupSettings.groupUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={onGroupLinkClick}
-                  className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                >
-                  <span>Join Community</span>
-                  <ExternalLink className="w-4 h-4 shrink-0" aria-hidden="true" />
-                </a>
-
-                <div>
-                  <label
-                    htmlFor="modal-roblox-username"
-                    className="block text-xs font-medium text-zinc-300 mb-2"
-                  >
-                    Enter your Roblox Username <span className="text-amber-400">*</span>
-                  </label>
-                  <input
-                    id="modal-roblox-username"
-                    type="text"
-                    required
-                    disabled={isGroupVerified}
-                    value={robloxUsername}
-                    onChange={(e) => onUsernameChange(e.target.value)}
-                    placeholder="Enter exact Roblox username"
-                    className="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 disabled:opacity-60 transition-colors"
-                  />
-                </div>
-
-                {errorMessage && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-3 rounded-lg bg-red-500/10 border border-red-500/30 p-3.5 text-red-300"
-                  >
-                    <AlertTriangle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" aria-hidden="true" />
-                    <p className="text-sm font-medium leading-snug">
-                      {errorMessage}
-                    </p>
+              {isPaymentUnlocked && isGroupVerified ? (
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <div className="text-sm font-semibold text-emerald-300">
+                        Verified Member · 15-Day Timer Completed
+                      </div>
+                      <p className="text-xs text-emerald-200/85 mt-0.5 leading-relaxed">
+                        Roblox Account:{' '}
+                        <span className="font-mono font-semibold text-white">
+                          {robloxUsername.trim() || 'Verified Member'}
+                        </span>
+                        . You can buy anytime without a timer with this username. Entering a new username will start a 15-day timer.
+                      </p>
+                    </div>
                   </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-3">
-                  {!isSignedIn ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onRequireSignIn();
-                      }}
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
-                    >
-                      <Lock className="w-4 h-4" aria-hidden="true" />
-                      <span>Sign In to Verify &amp; Buy</span>
-                    </button>
-                  ) : !isGroupVerified ? (
-                    <button
-                      type="button"
-                      disabled={isVerifyingApi}
-                      onClick={onVerifyMembership}
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:opacity-60 transition-colors"
-                    >
-                      {isVerifyingApi ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                          <span>Verifying Membership...</span>
-                        </>
-                      ) : (
-                        <span>Verify Membership</span>
-                      )}
-                    </button>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-300">
-                      <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-                      Verified Member
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 text-[11px] font-semibold text-emerald-200">
+                      No Timer Needed
                     </span>
-                  )}
-
-                  {isSignedIn && (hasClickedGroupLink || isGroupVerified || errorMessage) && (
                     <button
                       type="button"
-                      onClick={onResetVerification}
-                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 transition-colors"
+                      onClick={onSwitchRobloxUsername}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#090B0E] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:border-amber-400/60 hover:text-amber-300 transition-colors"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                      Reset Timer
+                      <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                      Use New Username
                     </button>
-                  )}
+                  </div>
                 </div>
-              </div>
-
-              {/* Step 2: 15-Day Live Countdown Timer */}
-              <div className="rounded-xl bg-[#0D1117] border border-white/[0.08] p-5 space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-display text-sm font-semibold text-zinc-100">
-                      15-Day Security Countdown Timer
-                    </h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {isPaymentUnlocked
-                        ? '15-day waiting period complete. Payment is now unlocked.'
-                        : isGroupVerified
-                        ? 'Verified Member! Timer active until 15-day hold completes.'
-                        : 'Join the group and click Verify Membership to start the 15-day timer.'}
+              ) : (
+                <>
+                  <div className="rounded-lg bg-[#0D1117] border border-white/[0.08] p-4">
+                    <p className="text-sm font-medium text-zinc-100 leading-relaxed">
+                      You must join our official Roblox community group before purchasing.
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                      Membership is verified against Group ID{' '}
+                      <span className="font-mono text-zinc-300">{groupSettings.groupId}</span>. Leaving the group automatically resets your 15-day timer.
                     </p>
                   </div>
-                  <Clock
-                    className={`w-5 h-5 shrink-0 ${
-                      isPaymentUnlocked
-                        ? 'text-emerald-400'
-                        : isGroupVerified
-                        ? 'text-amber-400'
-                        : 'text-zinc-600'
-                    }`}
-                    aria-hidden="true"
-                  />
-                </div>
 
-                <div className="grid grid-cols-4 gap-3 text-center">
-                  {[
-                    { label: 'Days', value: time.days },
-                    { label: 'Hours', value: time.hours },
-                    { label: 'Minutes', value: time.minutes },
-                    { label: 'Seconds', value: time.seconds },
-                  ].map((unit) => (
-                    <div
-                      key={unit.label}
-                      className="rounded-lg bg-[#131820] border border-white/[0.08] py-3 px-2"
+                  {/* Step 1: Join Community */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-zinc-300">
+                        Step 1. Join our official Roblox community group
+                      </span>
+                      <span
+                        className={`text-xs font-medium flex items-center gap-1.5 ${
+                          hasClickedGroupLink ? 'text-emerald-400' : 'text-zinc-500'
+                        }`}
+                      >
+                        {hasClickedGroupLink ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                            Link Clicked
+                          </>
+                        ) : (
+                          'Not Clicked Yet'
+                        )}
+                      </span>
+                    </div>
+
+                    <a
+                      href={groupSettings.groupUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={onGroupLinkClick}
+                      className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                     >
+                      <span>Join Community</span>
+                      <ExternalLink className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    </a>
+
+                    {isSignedIn && !isGroupVerified && savedVerifiedTimers.length > 0 && (
+                      <div className="rounded-lg bg-[#090B0E] border border-white/10 p-3 space-y-2">
+                        <div className="text-[11px] font-medium text-zinc-400">
+                          Previously Verified Roblox Accounts (no new timer for completed accounts):
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {savedVerifiedTimers.map((saved) => {
+                            const isReady = saved.unlockAtMs <= Date.now();
+                            const secsLeft = Math.max(0, Math.ceil((saved.unlockAtMs - Date.now()) / 1000));
+                            const daysLeft = Math.ceil(secsLeft / 86400);
+                            return (
+                              <button
+                                key={saved.robloxUsername.toLowerCase()}
+                                type="button"
+                                onClick={() => onSelectSavedUsername(saved)}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                  isReady
+                                    ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300 hover:bg-emerald-500/20'
+                                    : 'bg-amber-400/10 border-amber-400/35 text-amber-300 hover:bg-amber-400/20'
+                                }`}
+                              >
+                                <span className="font-mono">{saved.robloxUsername}</span>
+                                <span className="text-[10px] opacity-85">
+                                  {isReady ? '✓ No Timer' : `${daysLeft}d left`}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label
+                        htmlFor="modal-roblox-username"
+                        className="block text-xs font-medium text-zinc-300 mb-2"
+                      >
+                        Enter your Roblox Username <span className="text-amber-400">*</span>
+                      </label>
+                      <input
+                        id="modal-roblox-username"
+                        type="text"
+                        required
+                        disabled={isGroupVerified}
+                        value={robloxUsername}
+                        onChange={(e) => onUsernameChange(e.target.value)}
+                        placeholder="Enter exact Roblox username"
+                        className="w-full min-h-[44px] rounded-lg bg-[#090B0E] border border-white/10 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 disabled:opacity-60 transition-colors"
+                      />
+                    </div>
+
+                    {errorMessage && (
                       <div
-                        className={`font-mono text-xl sm:text-2xl font-semibold tabular-nums ${
+                        role="alert"
+                        className="flex items-start gap-3 rounded-lg bg-red-500/10 border border-red-500/30 p-3.5 text-red-300"
+                      >
+                        <AlertTriangle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" aria-hidden="true" />
+                        <p className="text-sm font-medium leading-snug">
+                          {errorMessage}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      {!isSignedIn ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onRequireSignIn();
+                          }}
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 transition-colors"
+                        >
+                          <Lock className="w-4 h-4" aria-hidden="true" />
+                          <span>Sign In to Verify &amp; Buy</span>
+                        </button>
+                      ) : !isGroupVerified ? (
+                        <button
+                          type="button"
+                          disabled={isVerifyingApi}
+                          onClick={onVerifyMembership}
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:opacity-60 transition-colors"
+                        >
+                          {isVerifyingApi ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                              <span>Verifying Membership...</span>
+                            </>
+                          ) : (
+                            <span>Verify Membership</span>
+                          )}
+                        </button>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                            <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                            Verified Member
+                          </span>
+                          <button
+                            type="button"
+                            onClick={onSwitchRobloxUsername}
+                            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[#090B0E] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-amber-400/60 hover:text-amber-300 transition-colors"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                            Use New Username
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step 2: 15-Day Live Countdown Timer */}
+                  <div className="rounded-xl bg-[#0D1117] border border-white/[0.08] p-5 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-display text-sm font-semibold text-zinc-100">
+                          15-Day Security Countdown Timer
+                        </h3>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          {isPaymentUnlocked
+                            ? '15-day waiting period complete. Payment is now unlocked.'
+                            : isGroupVerified
+                            ? 'Verified Member! Timer active until 15-day hold completes.'
+                            : 'Join the group and click Verify Membership to start the 15-day timer.'}
+                        </p>
+                      </div>
+                      <Clock
+                        className={`w-5 h-5 shrink-0 ${
                           isPaymentUnlocked
                             ? 'text-emerald-400'
                             : isGroupVerified
-                            ? 'text-amber-300'
-                            : 'text-zinc-500'
+                            ? 'text-amber-400'
+                            : 'text-zinc-600'
                         }`}
-                      >
-                        {unit.value}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-zinc-400">{unit.label}</div>
+                        aria-hidden="true"
+                      />
                     </div>
-                  ))}
-                </div>
 
-                {isAdmin && !isPaymentUnlocked && (
-                  <button
-                    type="button"
-                    onClick={onAdminUnlockTimer}
-                    className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400/15 border border-amber-400/40 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/25 transition-colors"
-                  >
-                    <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-                    Admin: Complete Timer &amp; Unlock Payment
-                  </button>
-                )}
-              </div>
+                    <div className="grid grid-cols-4 gap-3 text-center">
+                      {[
+                        { label: 'Days', value: time.days },
+                        { label: 'Hours', value: time.hours },
+                        { label: 'Minutes', value: time.minutes },
+                        { label: 'Seconds', value: time.seconds },
+                      ].map((unit) => (
+                        <div
+                          key={unit.label}
+                          className="rounded-lg bg-[#131820] border border-white/[0.08] py-3 px-2"
+                        >
+                          <div
+                            className={`font-mono text-xl sm:text-2xl font-semibold tabular-nums ${
+                              isPaymentUnlocked
+                                ? 'text-emerald-400'
+                                : isGroupVerified
+                                ? 'text-amber-300'
+                                : 'text-zinc-500'
+                            }`}
+                          >
+                            {unit.value}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-zinc-400">{unit.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {isAdmin && !isPaymentUnlocked && (
+                      <button
+                        type="button"
+                        onClick={onAdminUnlockTimer}
+                        className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400/15 border border-amber-400/40 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/25 transition-colors"
+                      >
+                        <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+                        Admin: Complete Timer &amp; Unlock Payment
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Step 3: Payment Section inside Checkout Modal */}
               <div

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Unlock,
+  UserPlus,
   X,
   Zap,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ import {
   PAYMENT_LOCKED_MESSAGE,
   PAYMENT_OPTIONS,
   RobuxPackage,
+  VerificationTimerState,
   formatCountdown,
   normalizeOrderStatus,
 } from '../data/packages';
@@ -39,6 +41,7 @@ interface VerificationAndPaymentSectionProps {
   isVerifyingApi: boolean;
   isSubmittingOrder?: boolean;
   remainingSeconds: number;
+  savedVerifiedTimers?: VerificationTimerState[];
   errorMessage: string | null;
   paymentError?: string | null;
   selectedPaymentId: string | null;
@@ -52,8 +55,10 @@ interface VerificationAndPaymentSectionProps {
   onRequireSignIn: () => void;
   onGroupLinkClick: () => void;
   onVerifyMembership: () => void;
+  onSwitchRobloxUsername: () => void;
+  onSelectSavedUsername: (saved: VerificationTimerState) => void;
   onAdminUnlockTimer: () => void;
-  onResetVerification: () => void;
+  onStartAnotherOrder: () => void;
   onClearPaymentError?: () => void;
   onSelectPayment: (id: string) => void;
   onShowOutOfStock?: () => void;
@@ -73,6 +78,7 @@ export function VerificationAndPaymentSection({
   isVerifyingApi,
   isSubmittingOrder = false,
   remainingSeconds,
+  savedVerifiedTimers = [],
   errorMessage,
   paymentError = null,
   selectedPaymentId,
@@ -81,8 +87,10 @@ export function VerificationAndPaymentSection({
   onRequireSignIn,
   onGroupLinkClick,
   onVerifyMembership,
+  onSwitchRobloxUsername,
+  onSelectSavedUsername,
   onAdminUnlockTimer,
-  onResetVerification,
+  onStartAnotherOrder,
   onClearPaymentError,
   onSelectPayment,
   onShowOutOfStock,
@@ -256,6 +264,38 @@ export function VerificationAndPaymentSection({
                 </span>
               </div>
 
+              {isSignedIn && !isGroupVerified && savedVerifiedTimers.length > 0 && (
+                <div className="rounded-lg bg-[#090B0E] border border-white/10 p-3 space-y-2">
+                  <div className="text-[11px] font-medium text-zinc-400">
+                    Previously Verified Roblox Accounts (no timer for completed accounts):
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {savedVerifiedTimers.map((saved) => {
+                      const isReady = saved.unlockAtMs <= Date.now();
+                      const secsLeft = Math.max(0, Math.ceil((saved.unlockAtMs - Date.now()) / 1000));
+                      const daysLeft = Math.ceil(secsLeft / 86400);
+                      return (
+                        <button
+                          key={saved.robloxUsername.toLowerCase()}
+                          type="button"
+                          onClick={() => onSelectSavedUsername(saved)}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                            isReady
+                              ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-300 hover:bg-emerald-500/20'
+                              : 'bg-amber-400/10 border-amber-400/35 text-amber-300 hover:bg-amber-400/20'
+                          }`}
+                        >
+                          <span className="font-mono">{saved.robloxUsername}</span>
+                          <span className="text-[10px] opacity-85">
+                            {isReady ? '✓ No Timer' : `${daysLeft}d left`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label
                   htmlFor="inline-roblox-username"
@@ -318,13 +358,21 @@ export function VerificationAndPaymentSection({
                     )}
                   </button>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-2 text-xs font-semibold text-emerald-300">
-                    <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-                    Verified Member
-                  </span>
+                  <>
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-2 text-xs font-semibold text-emerald-300">
+                      <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                      Verified Member
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onSwitchRobloxUsername}
+                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg bg-[#090B0E] border border-white/15 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-amber-400/60 hover:text-amber-300 transition-colors"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                      Use New Username
+                    </button>
+                  </>
                 )}
-
-
               </div>
             </div>
 
@@ -775,7 +823,7 @@ export function VerificationAndPaymentSection({
                   </a>
                   <button
                     type="button"
-                    onClick={onResetVerification}
+                    onClick={onStartAnotherOrder}
                     className="min-h-[40px] rounded-lg bg-zinc-900 border border-white/10 px-4 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-colors whitespace-nowrap"
                   >
                     Start Another Order

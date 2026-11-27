@@ -22,6 +22,8 @@ export interface RegisteredUser {
   phone: string;
   password: string;
   avatar?: string;
+  verificationTimer?: VerificationTimerState;
+  verifiedRobloxTimers?: Record<string, VerificationTimerState>;
   updatedAtMs?: number;
   createdAt: string;
 }

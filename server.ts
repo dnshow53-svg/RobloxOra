@@ -64,6 +64,15 @@ interface StoreGroupSettings {
   updatedAtMs?: number;
 }
 
+interface StoreVerificationTimer {
+  hasClickedGroupLink: boolean;
+  isGroupVerified: boolean;
+  unlockAtMs: number;
+  verifiedAtMs: number;
+  robloxUsername: string;
+  robloxUserId: number | null;
+}
+
 interface StoreUser {
   id: string;
   name: string;
@@ -71,6 +80,8 @@ interface StoreUser {
   phone: string;
   password: string;
   avatar?: string;
+  verificationTimer?: StoreVerificationTimer;
+  verifiedRobloxTimers?: Record<string, StoreVerificationTimer>;
   updatedAtMs?: number;
   createdAt: string;
 }
@@ -184,7 +195,9 @@ function ensureStoreFile(): StoreDatabase {
       users: Array.isArray(parsed.users)
         ? parsed.users.map((u) => ({
             ...u,
-            avatar: typeof u.avatar === 'string' ? u.avatar : '',
+            avatar: sanitizeAvatarValue(u.avatar),
+            verificationTimer: sanitizeVerificationTimer(u.verificationTimer),
+            verifiedRobloxTimers: sanitizeVerifiedRobloxTimers(u.verifiedRobloxTimers),
             updatedAtMs: typeof u.updatedAtMs === 'number' ? u.updatedAtMs : 0,
           }))
         : [],
@@ -214,6 +227,84 @@ function ensureStoreFile(): StoreDatabase {
   } catch {
     return structuredClone(DEFAULT_STORE);
   }
+}
+
+function sanitizeAvatarValue(rawAvatar: unknown): string {
+  if (typeof rawAvatar !== 'string') return '';
+  const trimmed = rawAvatar.trim();
+  if (!trimmed) return '';
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/uploads/')) {
+    try {
+      const safeName = path.basename(trimmed);
+      const diskPath = path.join(UPLOADS_DIR, safeName);
+      if (fs.existsSync(diskPath)) {
+        const stat = fs.statSync(diskPath);
+        if (stat.isFile() && stat.size > 0 && stat.size <= 350 * 1024) {
+          const ext = path.extname(safeName).toLowerCase();
+          const mime =
+            ext === '.png'
+              ? 'image/png'
+              : ext === '.webp'
+              ? 'image/webp'
+              : ext === '.gif'
+              ? 'image/gif'
+              : 'image/jpeg';
+          const b64 = fs.readFileSync(diskPath).toString('base64');
+          return `data:${mime};base64,${b64}`;
+        }
+        return trimmed;
+      }
+    } catch {
+      // Ignore disk errors and clear dead upload path
+    }
+    return '';
+  }
+  return '';
+}
+
+function sanitizeVerificationTimer(raw: unknown): StoreVerificationTimer | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const obj = raw as Partial<StoreVerificationTimer>;
+  return {
+    hasClickedGroupLink: Boolean(obj.hasClickedGroupLink),
+    isGroupVerified: Boolean(obj.isGroupVerified),
+    unlockAtMs:
+      typeof obj.unlockAtMs === 'number' && Number.isFinite(obj.unlockAtMs)
+        ? Math.max(0, obj.unlockAtMs)
+        : 0,
+    verifiedAtMs:
+      typeof obj.verifiedAtMs === 'number' && Number.isFinite(obj.verifiedAtMs)
+        ? Math.max(0, obj.verifiedAtMs)
+        : 0,
+    robloxUsername: typeof obj.robloxUsername === 'string' ? obj.robloxUsername.trim().slice(0, 32) : '',
+    robloxUserId:
+      typeof obj.robloxUserId === 'number' && Number.isFinite(obj.robloxUserId) && obj.robloxUserId > 0
+        ? obj.robloxUserId
+        : null,
+  };
+}
+
+function sanitizeVerifiedRobloxTimers(
+  raw: unknown
+): Record<string, StoreVerificationTimer> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const entries = Object.entries(raw as Record<string, unknown>);
+  const out: Record<string, StoreVerificationTimer> = {};
+  for (const [key, val] of entries) {
+    const cleanKey = String(key || '').trim().toLowerCase().slice(0, 32);
+    if (!cleanKey) continue;
+    const sanitized = sanitizeVerificationTimer(val);
+    if (sanitized) {
+      out[cleanKey] = sanitized;
+    }
+  }
+  return out;
 }
 
 function writeStoreFile(store: StoreDatabase): void {
@@ -346,6 +437,9 @@ async function startServer() {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   }
   app.use('/uploads', express.static(UPLOADS_DIR));
+  app.use('/uploads', (_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Uploaded file not found' });
+  });
 
   // Product photo upload endpoint (Admin uploads image file -> saved to data/uploads/)
   app.post('/api/uploads', (req: Request, res: Response) => {
@@ -860,8 +954,9 @@ async function startServer() {
       res.status(400).json({ error: 'Invalid user payload' });
       return;
     }
-    const cleanAvatar =
-      typeof body.avatar === 'string' ? body.avatar.trim() : '';
+    const cleanAvatar = sanitizeAvatarValue(body.avatar);
+    const cleanTimer = sanitizeVerificationTimer(body.verificationTimer);
+    const cleanTimersMap = sanitizeVerifiedRobloxTimers(body.verifiedRobloxTimers);
     const incomingTs =
       typeof body.updatedAtMs === 'number' && Number.isFinite(body.updatedAtMs)
         ? body.updatedAtMs
@@ -870,10 +965,19 @@ async function startServer() {
       (u) => u.email.toLowerCase() === cleanEmail
     );
     if (existingByEmail) {
-      if (incomingTs > (existingByEmail.updatedAtMs || 0) && cleanAvatar) {
+      if (incomingTs > (existingByEmail.updatedAtMs || 0)) {
         const merged: StoreUser = {
           ...existingByEmail,
-          avatar: cleanAvatar,
+          name: cleanName || existingByEmail.name,
+          phone: cleanPhone || existingByEmail.phone,
+          password: password || existingByEmail.password,
+          avatar: typeof body.avatar === 'string' ? cleanAvatar : existingByEmail.avatar || '',
+          verificationTimer:
+            cleanTimer !== undefined ? cleanTimer : existingByEmail.verificationTimer,
+          verifiedRobloxTimers:
+            cleanTimersMap !== undefined
+              ? { ...(existingByEmail.verifiedRobloxTimers || {}), ...cleanTimersMap }
+              : existingByEmail.verifiedRobloxTimers,
           updatedAtMs: incomingTs,
         };
         store.users = store.users.map((u) =>
@@ -893,6 +997,8 @@ async function startServer() {
       phone: cleanPhone,
       password,
       avatar: cleanAvatar,
+      verificationTimer: cleanTimer,
+      verifiedRobloxTimers: cleanTimersMap,
       updatedAtMs: incomingTs,
       createdAt: String(body.createdAt || new Date().toISOString()),
     };
@@ -922,7 +1028,9 @@ async function startServer() {
           email: cleanEmail,
           phone: cleanPhone,
           password,
-          avatar: typeof body.avatar === 'string' ? body.avatar.trim() : '',
+          avatar: sanitizeAvatarValue(body.avatar),
+          verificationTimer: sanitizeVerificationTimer(body.verificationTimer),
+          verifiedRobloxTimers: sanitizeVerifiedRobloxTimers(body.verifiedRobloxTimers),
           updatedAtMs:
             typeof body.updatedAtMs === 'number' && Number.isFinite(body.updatedAtMs)
               ? body.updatedAtMs
@@ -948,6 +1056,8 @@ async function startServer() {
       res.status(409).json({ error: 'Email already registered to another user' });
       return;
     }
+    const incomingTimer = sanitizeVerificationTimer(body.verificationTimer);
+    const incomingTimersMap = sanitizeVerifiedRobloxTimers(body.verifiedRobloxTimers);
     const updated: StoreUser = {
       ...found,
       name:
@@ -965,8 +1075,14 @@ async function startServer() {
           : found.password,
       avatar:
         typeof body.avatar === 'string'
-          ? body.avatar.trim()
-          : found.avatar || '',
+          ? sanitizeAvatarValue(body.avatar)
+          : sanitizeAvatarValue(found.avatar),
+      verificationTimer:
+        incomingTimer !== undefined ? incomingTimer : found.verificationTimer,
+      verifiedRobloxTimers:
+        incomingTimersMap !== undefined
+          ? incomingTimersMap
+          : found.verifiedRobloxTimers,
       updatedAtMs:
         typeof body.updatedAtMs === 'number' && Number.isFinite(body.updatedAtMs)
           ? Math.max(found.updatedAtMs || 0, body.updatedAtMs)
@@ -1056,7 +1172,14 @@ async function startServer() {
       const groupsJson = (await groupsRes.json()) as {
         data?: Array<{ group?: { id?: number } }>;
       };
-      const list = Array.isArray(groupsJson?.data) ? groupsJson.data : [];
+      if (!groupsJson || !Array.isArray(groupsJson.data)) {
+        res.json({
+          status: 'network_error',
+          message: 'Unexpected response from Roblox group API.',
+        });
+        return;
+      }
+      const list = groupsJson.data;
       const joined = list.some(
         (item) => Number(item?.group?.id) === targetGroupId
       );

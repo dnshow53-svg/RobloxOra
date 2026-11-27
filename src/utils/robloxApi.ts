@@ -93,7 +93,11 @@ export async function checkUserInRobloxGroup(
       data?: Array<{ group?: { id?: number; name?: string } }>;
     };
 
-    const list = Array.isArray(payload?.data) ? payload.data : [];
+    if (!payload || !Array.isArray(payload.data)) {
+      return 'network_error';
+    }
+
+    const list = payload.data;
     const isMember = list.some(
       (entry) => Number(entry?.group?.id) === Number(targetGroupId)
     );
